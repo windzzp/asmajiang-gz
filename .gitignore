@@ -34,5 +34,8 @@
 # vim
 *.swp
 
+# vim
+*.vscode
+
 # tag
 tags
