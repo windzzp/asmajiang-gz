@@ -1,23 +1,23 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <string.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <time.h>
-#include <errno.h>
-#include <algorithm>
-#include <assert.h>
-#include "zjh.h"
+#include "table.h"
+#include "card.h"
+#include "client.h"
 #include "game.h"
 #include "log.h"
-#include "table.h"
-#include "client.h"
 #include "player.h"
 #include "proto.h"
-#include "card.h"
+#include "zjh.h"
+#include <algorithm>
+#include <assert.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <time.h>
+#include <unistd.h>
 
 extern ZJH zjh;
 extern Log mjlog;
@@ -28,15 +28,14 @@ extern Log mjlog;
 #define AN_GANG_BET 2
 //鸡分值
 #define YAO_BAI_JI_BET 1          // 摇摆鸡
-#define BEN_JI_BET  1             // 本鸡
-#define WU_GU_JI_BET  1           // 乌骨鸡
+#define BEN_JI_BET 1              // 本鸡
+#define WU_GU_JI_BET 1            // 乌骨鸡
 #define CHONG_FENG_WU_GU_JI_BET 2 // 冲锋乌骨鸡
 #define YAO_JI_BET 1              // 幺鸡
 #define CHONG_FEN_JI_BET 2        // 冲锋鸡
 #define ZE_REN_JI_BET 2           // 责任鸡
 #define JIN_JI_BET 2              // 金鸡
 #define BAO_JI_BET 1              // 包鸡
-
 
 #define PREREADY_TIME_OUT 6
 #define SINGLE_READY_TIME_OUNT 8
@@ -45,53 +44,52 @@ extern Log mjlog;
 #define BET_TIME_OUT 10
 #define COMPARE_TIME_OUT 7
 #define READY_OUT_TIME_OUT 60
-#define DISMISS_TIME_OUT  30
+#define DISMISS_TIME_OUT 30
 
 #define SUBS_TIME_OUT 108000
-Table::Table() :
-preready_timer_stamp(PREREADY_TIME_OUT),
-ready_timer_stamp(READY_TIME_OUT),
-start_timer_stamp(START_TIME_OUT),
-bet_timer_stamp(BET_TIME_OUT),
-compare_timer_stamp(COMPARE_TIME_OUT),
-dismiss_timer_stamp(DISMISS_TIME_OUT),     
-subs_timer_stamp(SUBS_TIME_OUT)
+Table::Table() : preready_timer_stamp(PREREADY_TIME_OUT),
+                 ready_timer_stamp(READY_TIME_OUT),
+                 start_timer_stamp(START_TIME_OUT),
+                 bet_timer_stamp(BET_TIME_OUT),
+                 compare_timer_stamp(COMPARE_TIME_OUT),
+                 dismiss_timer_stamp(DISMISS_TIME_OUT),
+                 subs_timer_stamp(SUBS_TIME_OUT)
 {
-	preready_timer.data = this;
-	ev_timer_init(&preready_timer, Table::preready_timer_cb,
-			preready_timer_stamp, preready_timer_stamp);
+    preready_timer.data = this;
+    ev_timer_init(&preready_timer, Table::preready_timer_cb,
+                  preready_timer_stamp, preready_timer_stamp);
 
-	ready_timer.data = this;
-	ev_timer_init(&ready_timer, Table::ready_timer_cb, ready_timer_stamp,
-			ready_timer_stamp);
+    ready_timer.data = this;
+    ev_timer_init(&ready_timer, Table::ready_timer_cb, ready_timer_stamp,
+                  ready_timer_stamp);
 
-	start_timer.data = this;
-	ev_timer_init(&start_timer, Table::start_timer_cb, start_timer_stamp, start_timer_stamp);
+    start_timer.data = this;
+    ev_timer_init(&start_timer, Table::start_timer_cb, start_timer_stamp, start_timer_stamp);
 
-	bet_timer.data = this;
-	ev_timer_init(&bet_timer, Table::bet_timer_cb, bet_timer_stamp, bet_timer_stamp);
+    bet_timer.data = this;
+    ev_timer_init(&bet_timer, Table::bet_timer_cb, bet_timer_stamp, bet_timer_stamp);
 
-	compare_timer.data = this;
-	ev_timer_init(&compare_timer, Table::compare_timer_cb, compare_timer_stamp, compare_timer_stamp);
+    compare_timer.data = this;
+    ev_timer_init(&compare_timer, Table::compare_timer_cb, compare_timer_stamp, compare_timer_stamp);
     //single_ready_timer.data = this;
     //ev_timer_init(&single_ready_timer, Table::single_ready_timer_cb, single_ready_timer_stamp, single_ready_timer_stamp);
 
     dismiss_timer_stamp = zjh.conf["tables"]["dismiss_time"].asInt();
     dismiss_timer.data = this;
     ev_timer_init(&dismiss_timer, Table::dismiss_timer_cb, dismiss_timer_stamp, dismiss_timer_stamp);
-	ahead_start_timer_stamp = zjh.conf["tables"]["ahead_time"].asInt();
-	ahead_start_timer.data = this;
-	ev_timer_init(&ahead_start_timer, Table::ahead_start_timer_cb, ahead_start_timer_stamp, ahead_start_timer_stamp);
+    ahead_start_timer_stamp = zjh.conf["tables"]["ahead_time"].asInt();
+    ahead_start_timer.data = this;
+    ev_timer_init(&ahead_start_timer, Table::ahead_start_timer_cb, ahead_start_timer_stamp, ahead_start_timer_stamp);
 
     subs_timer.data = this;
     ev_timer_init(&subs_timer, Table::subs_timer_cb, subs_timer_stamp, subs_timer_stamp);
 
-	cur_flow_mode = FLOW_END;
+    cur_flow_mode = FLOW_END;
 
-	owner_uid = -1;
+    owner_uid = -1;
     owner_sex = -1;
-	owner_name = "";
-	owner_remote_ip = "";
+    owner_name = "";
+    owner_remote_ip = "";
     origin_owner_uid = -1;
     transfer_flag = false;
     game_end_flag = 0;
@@ -99,50 +97,50 @@ subs_timer_stamp(SUBS_TIME_OUT)
 
 Table::~Table()
 {
-	ev_timer_stop(zjh.loop, &preready_timer);
-	ev_timer_stop(zjh.loop, &ready_timer);
-	ev_timer_stop(zjh.loop, &start_timer);
-	ev_timer_stop(zjh.loop, &bet_timer);
-	ev_timer_stop(zjh.loop, &compare_timer);
+    ev_timer_stop(zjh.loop, &preready_timer);
+    ev_timer_stop(zjh.loop, &ready_timer);
+    ev_timer_stop(zjh.loop, &start_timer);
+    ev_timer_stop(zjh.loop, &bet_timer);
+    ev_timer_stop(zjh.loop, &compare_timer);
 
-	ev_timer_stop(zjh.loop, &dismiss_timer);
-	ev_timer_stop(zjh.loop, &ahead_start_timer);
-	ev_timer_stop(zjh.loop, &subs_timer);
+    ev_timer_stop(zjh.loop, &dismiss_timer);
+    ev_timer_stop(zjh.loop, &ahead_start_timer);
+    ev_timer_stop(zjh.loop, &subs_timer);
 }
 
 int Table::init(int my_tid, int my_vid, int my_zid, int my_type, float my_fee,
-		int my_min_money, int my_max_money, int my_base_money, int my_base_ratio,
-		int my_min_round, int my_max_round)
+                int my_min_money, int my_max_money, int my_base_money, int my_base_ratio,
+                int my_min_round, int my_max_round)
 {
-	// mjlog.debug("begin to init table [%d]\n", table_id);
-	tid = my_tid;
+    // mjlog.debug("begin to init table [%d]\n", table_id);
+    tid = my_tid;
     ttid = my_tid;
-	vid = my_vid;
-	zid = my_zid;
-	type = my_type;
-	fee = my_fee;
-	min_money = my_min_money;
-	max_money = my_max_money;
-	base_money = my_base_money;
-	base_ratio = my_base_ratio;
-	min_round = my_min_round;
-	max_round = my_max_round;
-	seat_max = 4;
+    vid = my_vid;
+    zid = my_zid;
+    type = my_type;
+    fee = my_fee;
+    min_money = my_min_money;
+    max_money = my_max_money;
+    base_money = my_base_money;
+    base_ratio = my_base_ratio;
+    min_round = my_min_round;
+    max_round = my_max_round;
+    seat_max = 4;
     max_play_board = 4;
     round_count = 0;
 
-	cur_players = 0;
-	players.clear();
+    cur_players = 0;
+    players.clear();
     ready_players = 0;
-	for (int i = 0; i < seat_max; i++)
-	{
+    for (int i = 0; i < seat_max; i++)
+    {
         seats[i].clear();
         seats[i].seatid = i;
         seats[i].lian_zhuang_cnt = 1; //连续作庄
         seats[i].jiao_pai = 0;
-	}
+    }
 
-	reset();
+    reset();
     dismiss_flag = 0;
     dismiss_uid = 0;
     hu_seat = -1;
@@ -152,14 +150,14 @@ int Table::init(int my_tid, int my_vid, int my_zid, int my_type, float my_fee,
     pao_hu_count = 0;
     gang_hu_count = 0;
 
-    tian_hu_flag = 0; //天胡
-    di_hu_flag = 0; //地胡
-    hai_di_hu_flag = 0;//海底胡
+    tian_hu_flag = 0;        //天胡
+    di_hu_flag = 0;          //地胡
+    hai_di_hu_flag = 0;      //海底胡
     gang_shang_hua_flag = 0; //杠上花
     gang_shang_hua_seat = -1;
-    gang_shang_pao = 0; //杠上炮
+    gang_shang_pao = 0;   //杠上炮
     quan_qiu_ren_pao = 0; //全求人炮
-    hai_di_pao = 0; //海底炮
+    hai_di_pao = 0;       //海底炮
     lian_gang_flag = 0;
     lian_gang_pao_flag = 0;
 
@@ -170,19 +168,19 @@ int Table::init(int my_tid, int my_vid, int my_zid, int my_type, float my_fee,
     create_rmb = 0;
 
     state = ROOM_WAIT_GAME;
-	redpackes.clear();
-	red_type = 0;
-    is_re_pao = 0;//热炮
-    is_qiang_gang = 0;//抢扛
+    redpackes.clear();
+    red_type = 0;
+    is_re_pao = 0;     //热炮
+    is_qiang_gang = 0; //抢扛
     jiao_pai_cnt = 0;
     has_chong_feng_ji = 0;
     has_chong_feng_wu_gu_ji = 0;
-    has_ze_ren_ji = 0; 
-    has_wu_gu_ze_ren_ji = 0; 
+    has_ze_ren_ji = 0;
+    has_wu_gu_ze_ren_ji = 0;
     has_wu_gu_ji = 0;
     has_yao_ji = 0;
     is_huang_zhuang = 0;
-    
+
     score_from_players_item_count.clear();
     score_from_players_item_total.clear();
     score_to_players_item_count.clear();
@@ -192,28 +190,28 @@ int Table::init(int my_tid, int my_vid, int my_zid, int my_type, float my_fee,
     set_card_flag = zjh.conf["tables"]["set_card_flag"].asInt();
     ts = time(NULL);
 
-	return 0;
+    return 0;
 }
 
 void Table::init_table_type(int set_type, int set_has_ghost, int set_has_feng, int set_hu_pair, int set_horse_num,
                             int set_max_board, int set_fang_pao, int set_dead_double, int set_forbid_same_ip,
-                            int set_forbid_same_place, int set_substitute,  int set_cost_select_flag, int set_ben_ji, int set_wu_gu_ji, int set_bao_ji)
+                            int set_forbid_same_place, int set_substitute, int set_cost_select_flag, int set_ben_ji, int set_wu_gu_ji, int set_bao_ji)
 {
     type = set_type;
     has_ghost = set_has_ghost;
     has_feng = set_has_feng;
     hu_pair = set_hu_pair;
     horse_num = set_horse_num;
-	redpackes.clear();
+    redpackes.clear();
     max_play_board = set_max_board;
     fang_pao = set_fang_pao;
-	substitute = set_substitute;
-	cost_select_flag = set_cost_select_flag;
+    substitute = set_substitute;
+    cost_select_flag = set_cost_select_flag;
     ts = time(NULL);
     ahead_start_flag = 0;
     ahead_start_uid = -1;
     dead_double = set_dead_double;
-	
+
     forbid_same_ip = set_forbid_same_ip;
     forbid_same_place = set_forbid_same_place;
     ben_ji = set_ben_ji;
@@ -225,72 +223,72 @@ void Table::init_table_type(int set_type, int set_has_ghost, int set_has_feng, i
 
 int Table::get_card_type(int salt)
 {
-	int tmp = random(0, 99, salt);
-	mjlog.debug("get_card_type[%d] salt[%d].\n", tmp, salt);
+    int tmp = random(0, 99, salt);
+    mjlog.debug("get_card_type[%d] salt[%d].\n", tmp, salt);
     return 0;
 }
 
 int Table::broadcast(Player *p, const std::string &packet)
 {
-	Player *player;
-	std::map<int, Player*>::iterator it;
-	for (it = players.begin(); it != players.end(); it++)
-	{
-		player = it->second;
-		if (player == p || player->client == NULL)
-		{
-			continue;
-		}
-		player->client->send(packet);
-	}
+    Player *player;
+    std::map<int, Player *>::iterator it;
+    for (it = players.begin(); it != players.end(); it++)
+    {
+        player = it->second;
+        if (player == p || player->client == NULL)
+        {
+            continue;
+        }
+        player->client->send(packet);
+    }
 
-	return 0;
+    return 0;
 }
 
 int Table::unicast(Player *p, const std::string &packet)
 {
-	if (p->client)
-	{
-		return p->client->send(packet);
-	}
-	return -1;
+    if (p->client)
+    {
+        return p->client->send(packet);
+    }
+    return -1;
 }
 
 int Table::random(int start, int end)
 {
-	srand((unsigned) time(NULL));
-	return start + rand() % (end - start + 1);
+    srand((unsigned)time(NULL));
+    return start + rand() % (end - start + 1);
 }
 
 int Table::random(int start, int end, int seed)
 {
-	srand((unsigned) time(NULL) + seed);
-	return start + rand() % (end - start + 1);
+    srand((unsigned)time(NULL) + seed);
+    return start + rand() % (end - start + 1);
 }
 
 void Table::reset()
 {
-	state = READY;
-	ready_players = 0;
-	start_seat = 0;
-	cur_seat = 0;
-	cur_action = 0;
-	cur_bet = 0;
-	total_bet = 0;
+    state = READY;
+    ready_players = 0;
+    start_seat = 0;
+    cur_seat = 0;
+    cur_action = 0;
+    cur_bet = 0;
+    total_bet = 0;
     last_action = 0;
     last_card.set_value(0);
     last_gang_card.set_value(0);
     win_seatid = -1;
-//  gang_hu_seat = -1; //确定下次庄的时候要用到，庄确定后，再重置
-//  pao_hu_seat = -1;
+    //  gang_hu_seat = -1; //确定下次庄的时候要用到，庄确定后，再重置
+    //  pao_hu_seat = -1;
     pao_hu_count = 0;
     gang_hu_count = 0;
 
-    tian_hu_flag = 0; //天胡
-    di_hu_flag = 0; //地胡
-    hai_di_hu_flag = 0;//海底胡
+    tian_hu_flag = 0;        //天胡
+    di_hu_flag = 0;          //地胡
+    hai_di_hu_flag = 0;      //海底胡
     gang_shang_hua_flag = 0; //杠上花
-    gang_shang_pao = 0; //杠上炮
+    gang_shang_pao = 0;      //杠上炮
     quan_qiu_ren_pao = 0;
     hai_di_pao = 0;
     gang_shang_hua_seat = -1;
@@ -300,7 +298,7 @@ void Table::reset()
     chi_count = 0;
     peng_count = 0;
     horse_count = 0;
-      gang_count = 0;
+    gang_count = 0;
 
     wait_handle_action = -1;
     wait_handler_seat = -1;
@@ -315,13 +313,14 @@ void Table::reset()
     jiao_pai_cnt = 0;
     has_chong_feng_ji = 0;
     has_chong_feng_wu_gu_ji = 0;
-    has_ze_ren_ji = 0; 
-    has_wu_gu_ze_ren_ji = 0; 
+    has_ze_ren_ji = 0;
+    has_wu_gu_ze_ren_ji = 0;
     has_wu_gu_ji = 0;
     has_yao_ji = 0;
     is_huang_zhuang = 0;
     ji_pai.clear();
-	reset_actions();
+    score_from_players_total.clear();
+    reset_actions();
     score_from_players_item_count.clear();
     score_from_players_item_total.clear();
     score_to_players_item_count.clear();
@@ -329,40 +328,40 @@ void Table::reset()
 }
 void Table::vector_to_json_array(std::vector<ji_data> &cards, Json::Value &val, string key, string key2)
 {
-	for (unsigned int i = 0; i < cards.size(); i++)
-	{
-		val[key].append(cards[i].value);
-		val[key2].append(cards[i].type);
-	}
+    for (unsigned int i = 0; i < cards.size(); i++)
+    {
+        val[key].append(cards[i].value);
+        val[key2].append(cards[i].type);
+    }
 }
 
 void Table::vector_to_json_array(std::vector<Card> &cards, Jpacket &packet, string key)
 {
-	for (unsigned int i = 0; i < cards.size(); i++)
-	{
-		packet.val[key].append(cards[i].value);
-	}
+    for (unsigned int i = 0; i < cards.size(); i++)
+    {
+        packet.val[key].append(cards[i].value);
+    }
 
-	if (cards.size() == 0)
-	{
-		packet.val[key].append(0);
-	}
+    if (cards.size() == 0)
+    {
+        packet.val[key].append(0);
+    }
 }
 
 void Table::vector_to_json_array(std::vector<Card> &cards, Json::Value &val, string key)
 {
-	for (unsigned int i = 0; i < cards.size(); i++)
-	{
-		val[key].append(cards[i].value);
-	}
+    for (unsigned int i = 0; i < cards.size(); i++)
+    {
+        val[key].append(cards[i].value);
+    }
 }
 
 void Table::vector_to_json_array(std::vector<int> &values, Json::Value &val, string key)
 {
-	for (unsigned int i = 0; i < values.size(); i++)
-	{
-		val[key].append(values[i]);
-	}
+    for (unsigned int i = 0; i < values.size(); i++)
+    {
+        val[key].append(values[i]);
+    }
 }
 
 void Table::vector_to_json_array(std::list<Card> &cards, Jpacket &packet, string key)
@@ -373,55 +372,55 @@ void Table::vector_to_json_array(std::list<Card> &cards, Jpacket &packet, string
         packet.val[key].append(it->value);
     }
 
-	if (cards.size() == 0)
-	{
-		packet.val[key].append(0);
-	}
+    if (cards.size() == 0)
+    {
+        packet.val[key].append(0);
+    }
 }
 
 void Table::map_to_json_array(std::map<int, int> &from_or_to, Json::Value &val,
-		string key, string key2)
+                              string key, string key2)
 {
-	std::map<int, int>::iterator it;
-	for (it = from_or_to.begin(); it != from_or_to.end(); it++)
-	{
+    std::map<int, int>::iterator it;
+    for (it = from_or_to.begin(); it != from_or_to.end(); it++)
+    {
         val[key].append(it->first);
         val[key2].append(it->second);
-	}
+    }
 }
 
 void Table::map_to_json_array(std::map<int, int> &count, Json::Value &val,
-		string key)
+                              string key)
 {
-	std::map<int, int>::iterator it;
-	for (it = count.begin(); it != count.end(); it++)
-	{
+    std::map<int, int>::iterator it;
+    for (it = count.begin(); it != count.end(); it++)
+    {
         val[key].append(it->second);
-	}
+    }
 }
 
 void Table::map_to_json_array(std::map<int, Card> &cards, Jpacket &packet,
-		string key)
+                              string key)
 {
-	std::map<int, Card>::iterator it;
-	for (it = cards.begin(); it != cards.end(); it++)
-	{
-		Card &card = it->second;
-		packet.val[key].append(card.value);
-	}
+    std::map<int, Card>::iterator it;
+    for (it = cards.begin(); it != cards.end(); it++)
+    {
+        Card &card = it->second;
+        packet.val[key].append(card.value);
+    }
 }
 
 void Table::json_array_to_vector(std::vector<Card> &cards, Jpacket &packet,
-		string key)
+                                 string key)
 {
-	Json::Value &val = packet.tojson();
+    Json::Value &val = packet.tojson();
 
-	for (unsigned int i = 0; i < val[key].size(); i++)
-	{
-		Card card(val[key][i].asInt());
+    for (unsigned int i = 0; i < val[key].size(); i++)
+    {
+        Card card(val[key][i].asInt());
 
-		cards.push_back(card);
-	}
+        cards.push_back(card);
+    }
 }
 
 int Table::handler_login(Player *player)
@@ -432,39 +431,39 @@ int Table::handler_login(Player *player)
     if (substitute == 1 && is_create)
     {
         handler_substitute_req(player);
-		ev_timer_again(zjh.loop, &subs_timer);
+        ev_timer_again(zjh.loop, &subs_timer);
         return 0;
     }
 
-	if (players.find(player->uid) == players.end())
-	{
-		players[player->uid] = player;
-		player->tid = tid;
-		// todo check.
-		player->seatid = sit_down(player);
-		Seat &seat = seats[player->seatid];
-		// seat.ready = 0;
-		seat.uid = player->uid;
-		if (player->seatid < 0)
-		{
-			return -1;
-		}
-		cur_players++;
+    if (players.find(player->uid) == players.end())
+    {
+        players[player->uid] = player;
+        player->tid = tid;
+        // todo check.
+        player->seatid = sit_down(player);
+        Seat &seat = seats[player->seatid];
+        // seat.ready = 0;
+        seat.uid = player->uid;
+        if (player->seatid < 0)
+        {
+            return -1;
+        }
+        cur_players++;
 
-		handler_login_succ_uc(player);
-		handler_login_succ_bc(player);
+        handler_login_succ_uc(player);
+        handler_login_succ_bc(player);
 
         if (is_create)
-		{
-			owner_uid = player->uid;
-			owner_name = player->name;
-			owner_remote_ip = player->remote_ip;
-			owner_sex = player->sex;
-			origin_owner_uid = owner_uid;
-			state = ROOM_WAIT_GAME;
-		}
+        {
+            owner_uid = player->uid;
+            owner_name = player->name;
+            owner_remote_ip = player->remote_ip;
+            owner_sex = player->sex;
+            origin_owner_uid = owner_uid;
+            state = ROOM_WAIT_GAME;
+        }
 
-		handler_table_info(player);
+        handler_table_info(player);
 
         if (player->uid < 1000 && player->uid > 100)
         {
@@ -478,132 +477,132 @@ int Table::handler_login(Player *player)
 
         mjlog.info("handler login succ uid[%d] money[%d] cur_players[%d] tid[%d].\n", player->uid, player->money, cur_players, tid);
 
-		return 0;
-	}
+        return 0;
+    }
 
-	return -1;
+    return -1;
 }
 
 int Table::sit_down(Player *player)
 {
-	std::vector<int> tmp;
-	for (int i = 0; i < seat_max; i++)
-	{
-		if (seats[i].occupied == 0)
-		{
-			tmp.push_back(i);
-		}
-	}
+    std::vector<int> tmp;
+    for (int i = 0; i < seat_max; i++)
+    {
+        if (seats[i].occupied == 0)
+        {
+            tmp.push_back(i);
+        }
+    }
 
-	int len = tmp.size();
-	if (len > 0)
-	{
-		int index = random(0, len - 1);
-		int i = tmp[index];
-		mjlog.debug("len[%d] index[%d] i[%d]\n", len, index, i);
-		// seats[i].reset(); 
-		seats[i].occupied = 1;
-		seats[i].player = player;
-		return i;
-	}
+    int len = tmp.size();
+    if (len > 0)
+    {
+        int index = random(0, len - 1);
+        int i = tmp[index];
+        mjlog.debug("len[%d] index[%d] i[%d]\n", len, index, i);
+        // seats[i].reset();
+        seats[i].occupied = 1;
+        seats[i].player = player;
+        return i;
+    }
 
-	return -1;
+    return -1;
 }
 
 void Table::stand_up(Player *player)
 {
-	seats[player->seatid].clear();
+    seats[player->seatid].clear();
 }
 
 int Table::del_player(Player *player)
 {
-	if (players.find(player->uid) == players.end())
-	{
-		mjlog.debug("player uid[%d] talbe del_player is error.", player->uid);
-		return -1;
-	}
-	Seat &seat = seats[player->seatid];
-	if (seat.ready == 1)
-	{
-		ready_players--;
-	}
-	player->stop_offline_timer();
-	players.erase(player->uid);
-	stand_up(player);
-	cur_players--;
+    if (players.find(player->uid) == players.end())
+    {
+        mjlog.debug("player uid[%d] talbe del_player is error.", player->uid);
+        return -1;
+    }
+    Seat &seat = seats[player->seatid];
+    if (seat.ready == 1)
+    {
+        ready_players--;
+    }
+    player->stop_offline_timer();
+    players.erase(player->uid);
+    stand_up(player);
+    cur_players--;
 
     modify_substitute_info(player, 0);
 
-	return 0;
+    return 0;
 }
 
 int Table::handler_login_succ_uc(Player *player)
 {
-	Jpacket packet;
-	packet.val["cmd"] = SERVER_LOGIN_SUCC_UC;
-	packet.val["vid"] = player->vid;
-	packet.val["zid"] = player->zid;
-	packet.val["tid"] = player->tid;
-	packet.end();
-	unicast(player, packet.tostring());
+    Jpacket packet;
+    packet.val["cmd"] = SERVER_LOGIN_SUCC_UC;
+    packet.val["vid"] = player->vid;
+    packet.val["zid"] = player->zid;
+    packet.val["tid"] = player->tid;
+    packet.end();
+    unicast(player, packet.tostring());
 
-	return 0;
+    return 0;
 }
 
 // SERVER_LOGIN_SUCC_BC
 int Table::handler_login_succ_bc(Player *player)
 {
-	Seat &seat = seats[player->seatid];
+    Seat &seat = seats[player->seatid];
 
-	Jpacket packet;
-	packet.val["cmd"] = SERVER_LOGIN_SUCC_BC;
-	// packet.val["vid"] = player->vid;
-	// packet.val["zid"] = player->zid;
-	// packet.val["tid"] = player->tid;
-	packet.val["seatid"] = player->seatid;
-	packet.val["ready"] = seat.ready;
-	packet.val["betting"] = seat.betting;
-	packet.val["role"] = seat.role;
-	packet.val["status"] = seat.status;
-	packet.val["bet"] = seat.bet;
+    Jpacket packet;
+    packet.val["cmd"] = SERVER_LOGIN_SUCC_BC;
+    // packet.val["vid"] = player->vid;
+    // packet.val["zid"] = player->zid;
+    // packet.val["tid"] = player->tid;
+    packet.val["seatid"] = player->seatid;
+    packet.val["ready"] = seat.ready;
+    packet.val["betting"] = seat.betting;
+    packet.val["role"] = seat.role;
+    packet.val["status"] = seat.status;
+    packet.val["bet"] = seat.bet;
 
-	packet.val["uid"] = player->uid;
-	packet.val["name"] = player->name;
-	packet.val["sex"] = player->sex;
-	packet.val["avatar"] = player->avatar;
-	packet.val["zone"] = player->zone;
+    packet.val["uid"] = player->uid;
+    packet.val["name"] = player->name;
+    packet.val["sex"] = player->sex;
+    packet.val["avatar"] = player->avatar;
+    packet.val["zone"] = player->zone;
 
-	packet.val["rmb"] = player->rmb;
-	packet.val["money"] = player->money;
-	packet.val["total_board"] = player->total_board;
+    packet.val["rmb"] = player->rmb;
+    packet.val["money"] = player->money;
+    packet.val["total_board"] = player->total_board;
     packet.val["pay_total"] = player->pay_total;
 
     packet.val["ip"] = player->remote_ip;
-	packet.end();
+    packet.end();
 
-	broadcast(player, packet.tostring());
-	return 0;
+    broadcast(player, packet.tostring());
+    return 0;
 }
 
 int Table::handler_table_info(Player *player)
 {
-	Jpacket packet;
-	packet.val["cmd"] = SERVER_TABLE_INFO_UC;
-	packet.val["vid"] = player->vid;
-	packet.val["zid"] = player->zid;
-	packet.val["tid"] = player->tid;
+    Jpacket packet;
+    packet.val["cmd"] = SERVER_TABLE_INFO_UC;
+    packet.val["vid"] = player->vid;
+    packet.val["zid"] = player->zid;
+    packet.val["tid"] = player->tid;
     packet.val["ttid"] = ttid;
-	packet.val["seatid"] = player->seatid;
+    packet.val["seatid"] = player->seatid;
 
     if (round_count == 0)
     {
         state = ROOM_WAIT_GAME;
     }
-	packet.val["state"] = state;
-	packet.val["dealer"] = dealer;
-	packet.val["cur_seat"] = cur_seat;
-	packet.val["cur_bet"] = cur_bet;
-	packet.val["total_bet"] = total_bet;
+    packet.val["state"] = state;
+    packet.val["dealer"] = dealer;
+    packet.val["cur_seat"] = cur_seat;
+    packet.val["cur_bet"] = cur_bet;
+    packet.val["total_bet"] = total_bet;
     packet.val["base_money"] = base_money;
     packet.val["remain_cards"] = deck.size();
     packet.val["robot_flag"] = seats[player->seatid].robot_flag;
@@ -623,18 +622,18 @@ int Table::handler_table_info(Player *player)
     packet.val["ahead_start_uid"] = ahead_start_uid;
     packet.val["chu_seat"] = chu_seat;
     packet.val["chu_card"] = last_card.value;
-	packet.val["cost_select_flag"] = cost_select_flag;
-	mjlog.debug("handler_table_info redpackes.size() [%d] seats[%d].already_get_red [%d]\n", 
-			redpackes.size(), player->seatid, seats[player->seatid].already_get_red);
-	if(redpackes.size() > 0 && seats[player->seatid].already_get_red == 0)
-	{
-		packet.val["get_red"] = 1;
-	}
-	else 
-	{
-		packet.val["get_red"] = 0;
-	}
-	
+    packet.val["cost_select_flag"] = cost_select_flag;
+    mjlog.debug("handler_table_info redpackes.size() [%d] seats[%d].already_get_red [%d]\n",
+                redpackes.size(), player->seatid, seats[player->seatid].already_get_red);
+    if (redpackes.size() > 0 && seats[player->seatid].already_get_red == 0)
+    {
+        packet.val["get_red"] = 1;
+    }
+    else
+    {
+        packet.val["get_red"] = 0;
+    }
+
     packet.val["ben_ji"] = ben_ji;
     packet.val["bao_ji"] = bao_ji;
     packet.val["wu_gu_ji"] = wu_gu_ji;
@@ -649,11 +648,11 @@ int Table::handler_table_info(Player *player)
     }
     packet.val["trun_card"] = 0;
 
-    packet.val["tian_hu_flag"] = tian_hu_flag; //天胡
-    packet.val["di_hu_flag"] = di_hu_flag; //地胡
-    packet.val["hai_di_hu_flag"] = hai_di_hu_flag; //海底胡
+    packet.val["tian_hu_flag"] = tian_hu_flag;               //天胡
+    packet.val["di_hu_flag"] = di_hu_flag;                   //地胡
+    packet.val["hai_di_hu_flag"] = hai_di_hu_flag;           //海底胡
     packet.val["gang_shang_hua_flag"] = gang_shang_hua_flag; //杠上花
-    packet.val["gang_shang_pao"] = gang_shang_pao; //杠上炮
+    packet.val["gang_shang_pao"] = gang_shang_pao;           //杠上炮
     packet.val["dead_double"] = dead_double;
     packet.val["substitute"] = substitute;
 
@@ -685,21 +684,21 @@ int Table::handler_table_info(Player *player)
     packet.val["forbid_same_ip"] = forbid_same_ip;
     packet.val["forbid_same_place"] = forbid_same_place;
 
-	std::map<int, Player*>::iterator it;
-	int i = 0;
-	for (it = players.begin(); it != players.end(); it++)
-	{
-		Player *p = it->second;
-		Seat &seat = seats[p->seatid];
+    std::map<int, Player *>::iterator it;
+    int i = 0;
+    for (it = players.begin(); it != players.end(); it++)
+    {
+        Player *p = it->second;
+        Seat &seat = seats[p->seatid];
 
-		packet.val["players"][i]["uid"] = p->uid;
-		packet.val["players"][i]["seatid"] = p->seatid;
-		packet.val["players"][i]["ready"] = seat.ready;
-		packet.val["players"][i]["betting"] = seat.betting;
-		packet.val["players"][i]["role"] = seat.role;
-		packet.val["players"][i]["status"] = seat.status;
-		packet.val["players"][i]["bet"] = seat.bet;
-        packet.val["players"][i]["robot_flag"] =  seat.robot_flag;
+        packet.val["players"][i]["uid"] = p->uid;
+        packet.val["players"][i]["seatid"] = p->seatid;
+        packet.val["players"][i]["ready"] = seat.ready;
+        packet.val["players"][i]["betting"] = seat.betting;
+        packet.val["players"][i]["role"] = seat.role;
+        packet.val["players"][i]["status"] = seat.status;
+        packet.val["players"][i]["bet"] = seat.bet;
+        packet.val["players"][i]["robot_flag"] = seat.robot_flag;
         packet.val["players"][i]["dismiss"] = seat.dismiss;
         packet.val["players"][i]["ahead_start"] = seat.ahead_start;
         packet.val["players"][i]["net_status"] = (p->client == NULL) ? 0 : 1;
@@ -708,7 +707,7 @@ int Table::handler_table_info(Player *player)
         packet.val["players"][i]["forbid_hu"] = seat.forbid_hu;
         packet.val["players"][i]["forbided_seatid"] = seat.forbided_seatid;
         packet.val["players"][i]["has_chong_feng_ji"] = seat.has_chong_feng_ji;
-        packet.val["players"][i]["has_chong_feng_wu_gu_ji"] = seat.has_chong_feng_wu_gu_ji;//这个字段客端用的has_wu_gu_ji
+        packet.val["players"][i]["has_chong_feng_wu_gu_ji"] = seat.has_chong_feng_wu_gu_ji; //这个字段客端用的has_wu_gu_ji
         packet.val["players"][i]["has_ze_ren_ji"] = seat.has_ze_ren_ji;
         packet.val["players"][i]["has_wu_gu_ze_ren_ji"] = seat.has_wu_gu_ze_ren_ji;
 
@@ -716,9 +715,9 @@ int Table::handler_table_info(Player *player)
         {
             packet.val["players"][i]["obsorb_seats"].append(seat.obsorb_seats[j]);
         }
-  
-		if (player == p)
-		{
+
+        if (player == p)
+        {
             if (state == BETTING)
             {
                 std::vector<Card>::iterator vit;
@@ -744,7 +743,7 @@ int Table::handler_table_info(Player *player)
                 {
                     packet.val["players"][i]["pao_hu_card"] = hu_card;
                 }
-             
+
                 int osize = seat.hole_cards.obsorb_cards.size();
                 for (int j = 0; j < osize; j++)
                 {
@@ -761,7 +760,7 @@ int Table::handler_table_info(Player *player)
                 {
                     packet.val["players"][i]["discard_holes"].append(lit->value);
                 }
-            
+
                 packet.val["players"][i]["ting_flag"] = seat.ting;
                 if (seat.ting == 1)
                 {
@@ -791,7 +790,7 @@ int Table::handler_table_info(Player *player)
                     }
 
                     if (actions[NOTICE_TING] == 1)
-                    {       
+                    {
                         int index = 0;
                         std::map<int, vector<Card> >::iterator it = seat.hole_cards.ting_cards.begin();
                         for (; it != seat.hole_cards.ting_cards.end(); it++)
@@ -803,7 +802,7 @@ int Table::handler_table_info(Player *player)
                                 packet.val["ting_pattern"][index].append(it->second[j].value);
                             }
                             index++;
-                        }  
+                        }
                     }
 
                     if (actions[NOTICE_CHI] == 1)
@@ -835,7 +834,7 @@ int Table::handler_table_info(Player *player)
                     }
                 }
             }
-		}
+        }
         else
         {
             if (state == BETTING)
@@ -877,23 +876,23 @@ int Table::handler_table_info(Player *player)
             }
         }
 
-		packet.val["players"][i]["name"] = p->name;
-		packet.val["players"][i]["sex"] = p->sex;
-		packet.val["players"][i]["avatar"] = p->avatar;
-		packet.val["players"][i]["rmb"] = p->rmb;
-		packet.val["players"][i]["money"] = p->money;
+        packet.val["players"][i]["name"] = p->name;
+        packet.val["players"][i]["sex"] = p->sex;
+        packet.val["players"][i]["avatar"] = p->avatar;
+        packet.val["players"][i]["rmb"] = p->rmb;
+        packet.val["players"][i]["money"] = p->money;
         packet.val["players"][i]["ip"] = p->remote_ip;
 
-		i++;
-	}
+        i++;
+    }
 
-	packet.end();
-	unicast(player, packet.tostring());
+    packet.end();
+    unicast(player, packet.tostring());
 
     check_ip_conflict();
 
     zjh.game->set_in_game_flag(player, 1);
-	return 0;
+    return 0;
 }
 
 // int Table::single_ready_timeout()
@@ -920,50 +919,49 @@ int Table::handler_table_info(Player *player)
 // 	return 0;
 // }
 
-
 int Table::handler_ready(Player *player)
 {
-	if (state != READY  && state != ROOM_WAIT_GAME)
-	{
-		mjlog.error("handler_ready state[%d]\n", state);
-		return -1;
-	}
+    if (state != READY && state != ROOM_WAIT_GAME)
+    {
+        mjlog.error("handler_ready state[%d]\n", state);
+        return -1;
+    }
 
-	if (seats[player->seatid].ready == 1)
-	{
-		mjlog.error("player[%d] have been seted for game ready\n", player->uid);
-		return -1;
-	}
+    if (seats[player->seatid].ready == 1)
+    {
+        mjlog.error("player[%d] have been seted for game ready\n", player->uid);
+        return -1;
+    }
 
-	player->stop_offline_timer();
+    player->stop_offline_timer();
 
-	ready_players++;
-	seats[player->seatid].ready = 1;
-	seats[player->seatid].betting = 1;
+    ready_players++;
+    seats[player->seatid].ready = 1;
+    seats[player->seatid].betting = 1;
 
-	Jpacket packet;
-	packet.val["cmd"] = SERVER_READY_SUCC_BC;
-	packet.val["uid"] = player->uid;
-	packet.val["seatid"] = player->seatid;
-	packet.end();
-	broadcast(NULL, packet.tostring());
+    Jpacket packet;
+    packet.val["cmd"] = SERVER_READY_SUCC_BC;
+    packet.val["uid"] = player->uid;
+    packet.val["seatid"] = player->seatid;
+    packet.end();
+    broadcast(NULL, packet.tostring());
 
     mjlog.debug("handler_ready cur_players[%d], ready_players[%d]\n", cur_players, ready_players);
 
-	if (ready_players == cur_players)
-	{
-		if (ready_players >= max_ready_players)
-		{
-			return test_game_start();
-		}
-	}
+    if (ready_players == cur_players)
+    {
+        if (ready_players >= max_ready_players)
+        {
+            return test_game_start();
+        }
+    }
 
-	// if (ready_players == 2)
-	// {
-	//     ev_timer_stop(zjh.loop, &ready_timer);
-	// }
+    // if (ready_players == 2)
+    // {
+    //     ev_timer_stop(zjh.loop, &ready_timer);
+    // }
 
-	return 0;
+    return 0;
 }
 
 int Table::handler_preready()
@@ -976,51 +974,50 @@ int Table::handler_preready()
     }
 
     for (int i = 0; i < seat_max; i++)
-	{
-		seats[i].reset();
+    {
+        seats[i].reset();
     }
 
     reset();
 
-	std::map<int, Player*>::iterator it;
-	for (it = players.begin(); it != players.end(); it++)
-	{
-		Player *player = it->second;		
-	    player->reset();
-	}
+    std::map<int, Player *>::iterator it;
+    for (it = players.begin(); it != players.end(); it++)
+    {
+        Player *player = it->second;
+        player->reset();
+    }
 
-	Jpacket packet;
-	packet.val["cmd"] = SERVER_GAME_PREREADY_BC;
-	for (it = players.begin(); it != players.end(); it++)
-	{
-		Player *player = it->second;
-		packet.val["seatids"].append(player->seatid);
-	}
-	packet.end();
-	broadcast(NULL, packet.tostring());
+    Jpacket packet;
+    packet.val["cmd"] = SERVER_GAME_PREREADY_BC;
+    for (it = players.begin(); it != players.end(); it++)
+    {
+        Player *player = it->second;
+        packet.val["seatids"].append(player->seatid);
+    }
+    packet.end();
+    broadcast(NULL, packet.tostring());
 
     ev_timer_again(zjh.loop, &ready_timer);
 
-	return 0;
+    return 0;
 }
 
 void Table::preready_timer_cb(struct ev_loop *loop, struct ev_timer *w,
-		int revents)
+                              int revents)
 {
-	Table *table = (Table*) w->data;
-	ev_timer_stop(zjh.loop, &table->preready_timer);
-	table->handler_preready();
+    Table *table = (Table *)w->data;
+    ev_timer_stop(zjh.loop, &table->preready_timer);
+    table->handler_preready();
 }
 
 void Table::ready_timer_cb(struct ev_loop *loop, struct ev_timer *w,
-		int revents)
+                           int revents)
 {
-	Table *table = (Table*) w->data;
-	ev_timer_stop(zjh.loop, &table->ready_timer);
+    Table *table = (Table *)w->data;
+    ev_timer_stop(zjh.loop, &table->ready_timer);
 
-	table->ready_timeout();
+    table->ready_timeout();
 }
-
 
 int Table::ready_timeout()
 {
@@ -1031,56 +1028,56 @@ int Table::ready_timeout()
     //     ev_timer_again(zjh.loop, &ready_timer);
     // }
 
-	return 0;  
+    return 0;
 }
 
 void Table::start_timer_cb(struct ev_loop *loop, struct ev_timer *w, int revents)
 {
-	Table *table = (Table*) w->data;
-	ev_timer_stop(zjh.loop, &table->start_timer);
+    Table *table = (Table *)w->data;
+    ev_timer_stop(zjh.loop, &table->start_timer);
 
-	table->start_next_bet(0);
+    table->start_next_bet(0);
 }
 
 int Table::test_game_start()
 {
     int start_players = std::max(max_ready_players, 2);
 
-	if (ready_players < start_players)
-	{
-		ev_timer_stop(zjh.loop, &ready_timer);
-		mjlog.debug("current ready players less than 2\n");
-		return 1;
-	}
+    if (ready_players < start_players)
+    {
+        ev_timer_stop(zjh.loop, &ready_timer);
+        mjlog.debug("current ready players less than 2\n");
+        return 1;
+    }
 
-	if (state != READY && state != ROOM_WAIT_GAME)
-	{
-		mjlog.debug("game state isn't Ready\n");
-		return 2;
-	}
+    if (state != READY && state != ROOM_WAIT_GAME)
+    {
+        mjlog.debug("game state isn't Ready\n");
+        return 2;
+    }
 
-	ev_timer_stop(zjh.loop, &ready_timer);
-	/* here to start the first board */
-	game_start();
+    ev_timer_stop(zjh.loop, &ready_timer);
+    /* here to start the first board */
+    game_start();
 
-	return 0;
+    return 0;
 }
 
 int Table::game_start()
 {
-	ev_timer_stop(zjh.loop, &subs_timer);
-	ts = time(NULL);
-	state = BETTING;
-	mjlog.debug("game start.\n");
+    ev_timer_stop(zjh.loop, &subs_timer);
+    ts = time(NULL);
+    state = BETTING;
+    mjlog.debug("game start.\n");
     cur_flow_mode = zjh.game->flow_mode;
     mjlog.info("current flow mode is %d, tid %d.\n", cur_flow_mode, tid);
 
-	cur_bet = base_money;
-	total_bet = 0;
+    cur_bet = base_money;
+    total_bet = 0;
 
-	deck.fill();
-	deck.shuffle(tid);
-	//deck.debug();
+    deck.fill();
+    deck.shuffle(tid);
+    //deck.debug();
 
     if (round_count == 0)
     {
@@ -1088,39 +1085,39 @@ int Table::game_start()
         if (substitute == 1)
         {
             modify_substitute_info(1);
-			zjh.game->del_subs_table(owner_uid);
+            zjh.game->del_subs_table(owner_uid);
         }
     }
 
     round_count++;
 
-	if (round_count == 2 && max_ready_players == seat_max)
-	{
-		handler_redpacket();
-	}
+    if (round_count == 2 && max_ready_players == seat_max)
+    {
+        handler_redpacket();
+    }
 
     replay.init(ts, ttid);
     init_dealer();
     pao_hu_seat = -1;
     gang_hu_seat = -1;
 
-	int current_betting_seats = count_betting_seats();
-	int next = next_betting_seat(dealer);
+    int current_betting_seats = count_betting_seats();
+    int next = next_betting_seat(dealer);
 
     for (int c = 0; c < current_betting_seats; c++)
     {
-		Seat &seat = seats[next];
-		Player *player = seat.player;
-		if (player == NULL)
+        Seat &seat = seats[next];
+        Player *player = seat.player;
+        if (player == NULL)
         {
-			mjlog.warn("game start player is NULL seatid[%d] tid[%d].\n", next, tid);
-			continue;
-		}
+            mjlog.warn("game start player is NULL seatid[%d] tid[%d].\n", next, tid);
+            continue;
+        }
 
-		Jpacket packet;
-		packet.val["cmd"] = SERVER_GAME_START_BC;
-		packet.val["uid"] = player->uid;
-		packet.val["seatid"] = player->seatid;
+        Jpacket packet;
+        packet.val["cmd"] = SERVER_GAME_START_BC;
+        packet.val["uid"] = player->uid;
+        packet.val["seatid"] = player->seatid;
         packet.val["dealer"] = dealer;
         packet.val["base_money"] = base_money;
         packet.val["remain_cards"] = int(deck.cards.size());
@@ -1135,13 +1132,13 @@ int Table::game_start()
             packet.val["cur_seats"].append(i);
         }
 
-		deck.get_hole_cards(seat.hole_cards);
+        deck.get_hole_cards(seat.hole_cards);
         dump_hole_cards(seat.hole_cards.cards, next, 0);
         vector_to_json_array(seat.hole_cards.cards, packet, "holes");
-		packet.end();
-		unicast(player, packet.tostring());
+        packet.end();
+        unicast(player, packet.tostring());
         next = next_betting_seat(next);
-	}
+    }
 
     StartRecord record;
     memset(&replay.start_record, 0, sizeof(StartRecord));
@@ -1152,11 +1149,12 @@ int Table::game_start()
     for (int i = 0; i < seat_max; i++)
     {
         Seat &seat = seats[i];
-		if (seats[i].ready != 1){
-			continue;
-		}
+        if (seats[i].ready != 1)
+        {
+            continue;
+        }
         replay.start_record.uids[i] = seat.uid;
-		snprintf(replay.start_record.name[i], sizeof(record.name[i]), "%s", seat.player->name.c_str());
+        snprintf(replay.start_record.name[i], sizeof(record.name[i]), "%s", seat.player->name.c_str());
         for (int j = 0; j < seat.hole_cards.size(); j++)
         {
             replay.start_record.holes[i][j] = MBYTE(seat.hole_cards.cards[j].value);
@@ -1170,46 +1168,46 @@ int Table::game_start()
     config.dead_double = MBYTE(dead_double);
     config.forbid_same_ip = MBYTE(forbid_same_ip);
     config.forbid_same_place = MBYTE(forbid_same_place);
-    memcpy((void*)&(replay.start_record.config), &config, sizeof(config));
+    memcpy((void *)&(replay.start_record.config), &config, sizeof(config));
 
-	start_seat = cur_seat = dealer;
+    start_seat = cur_seat = dealer;
 
-	//ev_timer_again(zjh.loop, &start_timer);
+    //ev_timer_again(zjh.loop, &start_timer);
     start_next_bet(0);
-	return 0;
+    return 0;
 }
 
 int Table::count_next_bet()
 {
     struct timeval btime, etime;
     gettimeofday(&btime, NULL);
-	int _seat = next_player_seat();
-	if (_seat == -1)
-	{
-		mjlog.error("count next bet no active player.\n");
-		handler_preready();
-		return -1;
-	}
+    int _seat = next_player_seat();
+    if (_seat == -1)
+    {
+        mjlog.error("count next bet no active player.\n");
+        handler_preready();
+        return -1;
+    }
 
-	cur_seat = _seat;
-	start_next_bet(0);
+    cur_seat = _seat;
+    start_next_bet(0);
     gettimeofday(&etime, NULL);
     mjlog.debug("count next bet diff time %d usec\n", (etime.tv_sec - btime.tv_sec) * 1000000 + etime.tv_usec - btime.tv_usec);
-	return 0;
+    return 0;
 }
 
 int Table::start_next_bet(int flag)
 {
-	Seat &seat = seats[cur_seat];
-	Player *player = seat.player;
+    Seat &seat = seats[cur_seat];
+    Player *player = seat.player;
     int handler = 0;
     int fetch_flag = 0;
 
-	Jpacket packet;
-	packet.val["cmd"] = SERVER_NEXT_BET_BC;
-	packet.val["uid"] = player->uid;
-	packet.val["seatid"] = seat.seatid;
-	packet.val["money"] = player->money;
+    Jpacket packet;
+    packet.val["cmd"] = SERVER_NEXT_BET_BC;
+    packet.val["uid"] = player->uid;
+    packet.val["seatid"] = seat.seatid;
+    packet.val["money"] = player->money;
     packet.val["card"] = 0;
     packet.val["remain_cards"] = deck.size();
     packet.val["remain_time"] = BET_TIME_OUT;
@@ -1218,7 +1216,7 @@ int Table::start_next_bet(int flag)
 
     reset_actions();
 
-     // 处理托管
+    // 处理托管
     if (seat.robot_flag == 1)
     {
         if (deck.permit_get() == 0)
@@ -1236,7 +1234,7 @@ int Table::start_next_bet(int flag)
         packet.val["remain_cards"] = deck.size();
         packet.val["fetch_flag"] = 1;
         fetch_flag = 1;
-        handler = 1;    
+        handler = 1;
     }
 
     if (gang_hu_count > 1 || pao_hu_count > 1)
@@ -1274,20 +1272,20 @@ int Table::start_next_bet(int flag)
             handler = 1;
         }
     }
-  
+
     if ((last_action == PLAYER_CHU || last_action == PLAYER_GUO) && handler == 0 && seat.handler_flag == 0)
     {
         mjlog.debug("start_next_bet last_action is player_chu\n");
-        if (seat.hole_cards.permit_hu(last_card.value) )
+        if (seat.hole_cards.permit_hu(last_card.value))
         {
             if (find(seat.guo_hu_cards.begin(), seat.guo_hu_cards.end(), last_card.value) == seat.guo_hu_cards.end())
             {
-                if (seat.gang_count[1] == 0 && //没有转弯豆（碰杠）是不能胡牌
-                        seats[chu_seat].last_actions[1] != PLAYER_GANG &&//如果被胡玩家之前的操作是杠,则杠之后出的牌是可以不用碰杠也可以胡
-                        seats[chu_seat].last_actions[0] != PLAYER_GANG  //如果被胡玩家的当前操作是碰杠，则这个杠可以被抢胡，不需要碰杠也可以胡
-                   ) 
+                if (seat.gang_count[1] == 0 &&                        //没有转弯豆（碰杠）是不能胡牌
+                    seats[chu_seat].last_actions[1] != PLAYER_GANG && //如果被胡玩家之前的操作是杠,则杠之后出的牌是可以不用碰杠也可以胡
+                    seats[chu_seat].last_actions[0] != PLAYER_GANG    //如果被胡玩家的当前操作是碰杠，则这个杠可以被抢胡，不需要碰杠也可以胡
+                    )
                 {
-                    mjlog.debug("mei you zhuang wan dou");
+                    mjlog.debug("mei you zhuang wan dou\n");
                 }
                 else
                 {
@@ -1313,7 +1311,7 @@ int Table::start_next_bet(int flag)
             //     handler = 1;
             // }
             // 没牌摸了，不允许杠
-            if (seat.hole_cards.permit_gang(last_card.value) && deck.permit_get() == 1) 
+            if (seat.hole_cards.permit_gang(last_card.value) && deck.permit_get() == 1)
             {
                 mjlog.debug("start_next_bet last_action permit gang\n");
                 actions[NOTICE_GANG] = 1;
@@ -1322,8 +1320,7 @@ int Table::start_next_bet(int flag)
                 handler = 1;
             }
 
-            if (seat.hole_cards.permit_peng(last_card.value)
-                && find(seat.guo_peng_cards.begin(), seat.guo_peng_cards.end(), last_card.value) == seat.guo_peng_cards.end())
+            if (seat.hole_cards.permit_peng(last_card.value) && find(seat.guo_peng_cards.begin(), seat.guo_peng_cards.end(), last_card.value) == seat.guo_peng_cards.end())
             {
                 actions[NOTICE_PENG] = 1;
                 packet.val["peng_card"] = last_card.value;
@@ -1356,12 +1353,12 @@ int Table::start_next_bet(int flag)
             {
                 deck.get_next_card(seat.hole_cards);
             }
-            
+
             handler_recored_mo(seat.hole_cards.last_card.value, seat.seatid, -1);
             seat.guo_hu_cards.clear();
             seat.guo_peng_cards.clear();
             dump_hole_cards(seat.hole_cards.cards, cur_seat, 4);
-           
+
             get_card_seat = cur_seat;
             packet.val["card"] = seat.hole_cards.last_card.value;
             packet.val["remain_cards"] = deck.size();
@@ -1376,7 +1373,7 @@ int Table::start_next_bet(int flag)
         seat.hole_cards.analysis();
 
         mjlog.debug("start_next_bet last_action get next card[%d]\n", seat.hole_cards.last_card.value);
-        
+
         if (seat.hole_cards.permit_hu() && last_action != PLAYER_PENG && seat.forbid_hu == 0)
         {
             actions[NOTICE_HU] = 1;
@@ -1395,16 +1392,14 @@ int Table::start_next_bet(int flag)
             //     handler = 1;
             // }
             // 最后一张不允许杠
-            if (seat.hole_cards.permit_gang() && handler == 0
-                && deck.permit_get() == 1
-                && last_action != PLAYER_PENG)
+            if (seat.hole_cards.permit_gang() && handler == 0 && deck.permit_get() == 1 && last_action != PLAYER_PENG)
             {
                 actions[NOTICE_GANG] = 1;
                 actions[NOTICE_GUO] = 1;
             }
-        }   
+        }
     }
-    
+
     for (int i = 0; i < NOTICE_SIZE; i++)
     {
         packet.val["action"].append(actions[i]);
@@ -1421,7 +1416,7 @@ int Table::start_next_bet(int flag)
     }
 
     if (actions[NOTICE_TING] == 1)
-    {       
+    {
         int index = 0;
         std::map<int, vector<Card> >::iterator it = seat.hole_cards.ting_cards.begin();
         for (; it != seat.hole_cards.ting_cards.end(); it++)
@@ -1433,16 +1428,16 @@ int Table::start_next_bet(int flag)
                 packet.val["ting_pattern"][index].append(it->second[i].value);
             }
             index++;
-        }  
+        }
     }
 
-	packet.end();
+    packet.end();
     unicast(seat.player, packet.tostring());
 
     Jpacket packet1;
     packet1.val["cmd"] = SERVER_NEXT_BET_BC;
-	packet1.val["uid"] = player->uid;
-	packet1.val["seatid"] = seat.seatid;
+    packet1.val["uid"] = player->uid;
+    packet1.val["seatid"] = seat.seatid;
     packet1.val["remain_time"] = BET_TIME_OUT;
     packet1.val["remain_cards"] = deck.size();
     packet1.val["fetch_flag"] = fetch_flag;
@@ -1450,15 +1445,15 @@ int Table::start_next_bet(int flag)
     if (actions[NOTICE_GANG] == 1)
     {
         packet1.val["gang_flag"] = seat.hole_cards.gang_flag;
-    }   
+    }
     packet1.end();
     broadcast(seat.player, packet1.tostring());
 
-    if (actions[NOTICE_CHI] == 1 || actions[NOTICE_PENG] == 1 || actions[NOTICE_GANG] == 1 || 
-			actions[NOTICE_HU] == 1 || actions[NOTICE_GUO] ==1 )
-	{
-		handler_record_notice(cur_seat);
-	}
+    if (actions[NOTICE_CHI] == 1 || actions[NOTICE_PENG] == 1 || actions[NOTICE_GANG] == 1 ||
+        actions[NOTICE_HU] == 1 || actions[NOTICE_GUO] == 1)
+    {
+        handler_record_notice(cur_seat);
+    }
 
     if (seat.robot_flag == 1 || (seat.ting == 1 && actions[NOTICE_HU] != 1))
     {
@@ -1471,159 +1466,159 @@ int Table::start_next_bet(int flag)
         ev_timer_again(zjh.loop, &bet_timer);
     }
 
-	return 0;
+    return 0;
 }
 
 void Table::bet_timer_cb(struct ev_loop *loop, struct ev_timer *w, int revents)
 {
-	Table *table = (Table*) w->data;
-	ev_timer_stop(zjh.loop, &table->bet_timer);
-	mjlog.debug("bet_timer_cb\n");
-	table->bet_timeout();
+    Table *table = (Table *)w->data;
+    ev_timer_stop(zjh.loop, &table->bet_timer);
+    mjlog.debug("bet_timer_cb\n");
+    table->bet_timeout();
 }
 
 void Table::compare_timer_cb(struct ev_loop *loop, struct ev_timer *w,
-		int revents)
+                             int revents)
 {
-	Table *table = (Table*) w->data;
-	ev_timer_stop(zjh.loop, &table->compare_timer);
-	//mjlog.debug("compare_timer_cb\n");
-	//table->compare_timeout();
+    Table *table = (Table *)w->data;
+    ev_timer_stop(zjh.loop, &table->compare_timer);
+    //mjlog.debug("compare_timer_cb\n");
+    //table->compare_timeout();
 }
 
 int Table::handler_bet(Player *player)
 {
-	int ret;
+    int ret;
     Json::Value &val = player->client->packet.tojson();
-	int action = val["action"].asInt();
+    int action = val["action"].asInt();
 
-	if (state != BETTING)
-	{
-		mjlog.error("handler_bet state is not betting[%d]\n", state);
+    if (state != BETTING)
+    {
+        mjlog.error("handler_bet state is not betting[%d]\n", state);
         handler_bet_error(player, action);
-		return -1;
-	}
+        return -1;
+    }
 
-	Seat &seat = seats[player->seatid];
-	if (seat.player != player)
-	{
+    Seat &seat = seats[player->seatid];
+    if (seat.player != player)
+    {
         handler_bet_error(player, action);
-		mjlog.error("handler_bet player is no match with seat.player\n");
-		return -1;
-	}
+        mjlog.error("handler_bet player is no match with seat.player\n");
+        return -1;
+    }
 
     //player->noplay_count = 0;
 
-	if (cur_seat != player->seatid && (action != PLAYER_TUOGUAN) && (action != PLAYER_CANCEL_TUOGUAN))
-	{
-		mjlog.error("handler_bet player->seatid[%d] cur_seat[%d]\n",
-				player->seatid, cur_seat);
-		return -1;
-	}
+    if (cur_seat != player->seatid && (action != PLAYER_TUOGUAN) && (action != PLAYER_CANCEL_TUOGUAN))
+    {
+        mjlog.error("handler_bet player->seatid[%d] cur_seat[%d]\n",
+                    player->seatid, cur_seat);
+        return -1;
+    }
 
-	if (action == PLAYER_GUO)
-	{
-		ret = handler_guo(player);
-		if (ret < 0)
-		{
-			return -1;
-		}
-		//ev_timer_stop(zjh.loop, &bet_timer);
-		// count_next_bet();
-		return 0;
-	}
+    if (action == PLAYER_GUO)
+    {
+        ret = handler_guo(player);
+        if (ret < 0)
+        {
+            return -1;
+        }
+        //ev_timer_stop(zjh.loop, &bet_timer);
+        // count_next_bet();
+        return 0;
+    }
 
-	// if (action == PLAYER_CHI)
-	// {
-	// 	ret = handler_chi(player);
-	// 	if (ret < 0)
-	// 	{
-	// 		return -1;
-	// 	}
+    // if (action == PLAYER_CHI)
+    // {
+    // 	ret = handler_chi(player);
+    // 	if (ret < 0)
+    // 	{
+    // 		return -1;
+    // 	}
 
     //     start_next_bet(0);
 
-	// 	return 0;
-	// }
-	if (action == PLAYER_CHU)
-	{
+    // 	return 0;
+    // }
+    if (action == PLAYER_CHU)
+    {
         ret = handler_chu(player);
         if (ret < 0)
-		{
-			return -1;
-		}
-		ev_timer_stop(zjh.loop, &bet_timer);
+        {
+            return -1;
+        }
+        ev_timer_stop(zjh.loop, &bet_timer);
         count_next_bet();
-		return 0;
-	}
+        return 0;
+    }
     else if (action == PLAYER_PENG)
     {
         ret = handler_peng(player);
-		if (ret < 0)
-		{
-			return -1;
-		}
+        if (ret < 0)
+        {
+            return -1;
+        }
 
         start_next_bet(0);
-		return 0;
+        return 0;
     }
     else if (action == PLAYER_GANG)
     {
         ret = handler_gang(player);
-		if (ret < 0)
-		{
-			return -1;
-		}
+        if (ret < 0)
+        {
+            return -1;
+        }
 
         ev_timer_stop(zjh.loop, &bet_timer);
         ev_timer_again(zjh.loop, &bet_timer);
 
         count_next_bet();
-		// ev_timer_stop(zjh.loop, &bet_timer);
-		return 0;
+        // ev_timer_stop(zjh.loop, &bet_timer);
+        return 0;
     }
     else if (action == PLAYER_HU)
     {
         ret = handler_hu(player);
         if (ret < 0)
-		{
-			return -1;
-		}
-		ev_timer_stop(zjh.loop, &bet_timer);
+        {
+            return -1;
+        }
+        ev_timer_stop(zjh.loop, &bet_timer);
         mjlog.debug("player[%d] req hu card\n", player->uid);
         game_end();
 
-		return 0;
+        return 0;
     }
     else if (action == PLAYER_TING)
     {
         ret = handler_ting(player);
         if (ret < 0)
-		{
-			return -1;
-		}
-		ev_timer_stop(zjh.loop, &bet_timer);
+        {
+            return -1;
+        }
+        ev_timer_stop(zjh.loop, &bet_timer);
         count_next_bet();
-		return 0;
+        return 0;
     }
     else if (action == PLAYER_CANCEL)
     {
         ret = handler_cancel(player);
         if (ret < 0)
-		{
-			return -1;
-		}
-		ev_timer_stop(zjh.loop, &bet_timer);
-		return 0;
+        {
+            return -1;
+        }
+        ev_timer_stop(zjh.loop, &bet_timer);
+        return 0;
     }
     else if (action == PLAYER_JIABEI)
     {
         ret = handler_jiabei(player);
         if (ret < 0)
-		{
-			return -1;
-		}
-        
+        {
+            return -1;
+        }
+
         if (seat.hole_cards.size() % 3 != 2)
         {
             ev_timer_stop(zjh.loop, &bet_timer);
@@ -1636,21 +1631,21 @@ int Table::handler_bet(Player *player)
         return 0;
     }
 
-	return 0;
+    return 0;
 }
 
 void Table::bet_timeout()
 {
-	// Seat &seat = seats[cur_seat];
-	// Player *player = seat.player;
+    // Seat &seat = seats[cur_seat];
+    // Player *player = seat.player;
 
-	// if (player == NULL)
-	// {
-	// 	mjlog.error(
-	// 			"bet timeout null player ready_players[%d] cur_players[%d] tid[%d].\n",
-	// 			ready_players, cur_players, tid);
-	// 	return;
-	// }
+    // if (player == NULL)
+    // {
+    // 	mjlog.error(
+    // 			"bet timeout null player ready_players[%d] cur_players[%d] tid[%d].\n",
+    // 			ready_players, cur_players, tid);
+    // 	return;
+    // }
 
     // if (seat.hu == 1)
     // {
@@ -1697,48 +1692,48 @@ void Table::bet_timeout()
     // else
     // {
     //     return;
-    // }	
+    // }
 }
 
 void Table::compare_timeout()
 {
-	if (state != BETTING)
-	{
-		mjlog.error("compare timeout state[%d] is not BETTING.\n", state);
-		return;
-	}
-	int ret = test_game_end();
-	if (ret < 0)
-	{
-		count_next_bet();
-	}
+    if (state != BETTING)
+    {
+        mjlog.error("compare timeout state[%d] is not BETTING.\n", state);
+        return;
+    }
+    int ret = test_game_end();
+    if (ret < 0)
+    {
+        count_next_bet();
+    }
 }
 
 void Table::lose_update(Player *player)
 {
-	Seat &seat = seats[player->seatid];
+    Seat &seat = seats[player->seatid];
 
     player->incr_money(1, seat.bet);
-	player->incr_total_board(vid, 1);
-	mjlog.debug("lose_update total_board [%d] pre_uid[%d] \n",player->total_board ,player->pre_uid);
-	if ( player->pre_uid > 1000)
-	{
-		handler_invite_advantage(player);
-	}
+    player->incr_total_board(vid, 1);
+    mjlog.debug("lose_update total_board [%d] pre_uid[%d] \n", player->total_board, player->pre_uid);
+    if (player->pre_uid > 1000)
+    {
+        handler_invite_advantage(player);
+    }
 }
 
 void Table::win_update(Player *player)
 {
-	Seat &seat = seats[player->seatid];
- 
+    Seat &seat = seats[player->seatid];
+
     player->incr_money(0, seat.bet);
 
-	player->incr_total_board(vid, 1);
-	mjlog.debug("win_update total_board [%d] pre_uid[%d] \n",player->total_board ,player->pre_uid);
-	if (player->pre_uid > 1000)
-	{
-		handler_invite_advantage(player);
-	}
+    player->incr_total_board(vid, 1);
+    mjlog.debug("win_update total_board [%d] pre_uid[%d] \n", player->total_board, player->pre_uid);
+    if (player->pre_uid > 1000)
+    {
+        handler_invite_advantage(player);
+    }
 }
 
 void Table::update_money(Player *player, int value)
@@ -1747,15 +1742,14 @@ void Table::update_money(Player *player, int value)
     {
         return;
     }
-	player->incr_money(1, value);
-
+    player->incr_money(1, value);
 }
 
 int Table::test_game_end()
 {
-	int betting_players = count_betting_seats();
-	if (betting_players == 1)
-	{
+    int betting_players = count_betting_seats();
+    if (betting_players == 1)
+    {
         for (int i = 0; i < seat_max; i++)
         {
             if (seats[i].betting == 1)
@@ -1766,35 +1760,34 @@ int Table::test_game_end()
         }
 
         mjlog.debug("bet player only one, game end\n");
-		game_end();
-		return 0;
-	}
+        game_end();
+        return 0;
+    }
 
-	return -1;
+    return -1;
 }
 
 int Table::game_end(int flag)
 {
-	mjlog.debug("game_end[%d]\n", start_seat);
-	ev_timer_stop(zjh.loop, &bet_timer);
-	ev_timer_stop(zjh.loop, &start_timer);
-	ev_timer_stop(zjh.loop, &compare_timer);
+    mjlog.debug("game_end[%d]\n", start_seat);
+    ev_timer_stop(zjh.loop, &bet_timer);
+    ev_timer_stop(zjh.loop, &start_timer);
+    ev_timer_stop(zjh.loop, &compare_timer);
 
     state = END_GAME;
 
     if (players.size() == 0)
     {
         mjlog.error("game end state[%d], player size is null ttid[%d]\n", state, ttid);
-        return -1;	
+        return -1;
     }
 
     accumulate_hu();
 
-
     Jpacket packet;
-	packet.val["cmd"] = SERVER_GAME_END_BC;
-	packet.val["win_seatid"] = win_seatid;
-	packet.val["total_bet"] = total_bet;
+    packet.val["cmd"] = SERVER_GAME_END_BC;
+    packet.val["win_seatid"] = win_seatid;
+    packet.val["total_bet"] = total_bet;
     packet.val["cur_round"] = round_count;
 
     if (pao_hu_seat >= 0)
@@ -1810,8 +1803,8 @@ int Table::game_end(int flag)
         packet.val["fang_pao_seat"] = -1;
     }
 
-    vector_to_json_array(deck.horse_cards, packet, "horse_cards");//翻到的那张鸡牌
-	   
+    vector_to_json_array(deck.horse_cards, packet, "horse_cards"); //翻到的那张鸡牌
+
     if (win_seatid < 0 && gang_hu_count < 2 && pao_hu_count < 2)
     {
         win_bet = 0;
@@ -1841,15 +1834,15 @@ int Table::game_end(int flag)
                 lose_update(seats[i].player);
             }
         }
-         // 记录结果
+        // 记录结果
         insert_flow_record();
     }
     else
     {
-        packet.val["is_liuju"] = 0; 
+        packet.val["is_liuju"] = 0;
         update_account_bet();
 
-         // 记录结果
+        // 记录结果
         insert_flow_record();
 
         //int size = zhong_horse.size();
@@ -1857,7 +1850,7 @@ int Table::game_end(int flag)
         for (int i = 0; i < size; i++)
         {
             //packet.val["zhong_horse"].append(zhong_horse[i]);
-            packet.val["zhong_horse"].append(1);//这个字段在鸡中不用
+            packet.val["zhong_horse"].append(1); //这个字段在鸡中不用
         }
 
         for (int i = 0; i < seat_max; i++)
@@ -1878,30 +1871,30 @@ int Table::game_end(int flag)
         }
     }
 
-    packet.val["tian_hu_flag"] = tian_hu_flag; //天胡
-    packet.val["di_hu_flag"] = di_hu_flag; //地胡
-    packet.val["hai_di_hu_flag"] = hai_di_hu_flag; //海底胡
+    packet.val["tian_hu_flag"] = tian_hu_flag;               //天胡
+    packet.val["di_hu_flag"] = di_hu_flag;                   //地胡
+    packet.val["hai_di_hu_flag"] = hai_di_hu_flag;           //海底胡
     packet.val["gang_shang_hua_flag"] = gang_shang_hua_flag; //杠上花
-    packet.val["gang_shang_pao"] = gang_shang_pao; //杠上炮
+    packet.val["gang_shang_pao"] = gang_shang_pao;           //杠上炮
     packet.val["dead_double"] = dead_double;
 
-	int j = 0;
-	for (int i = 0; i < seat_max; i++)
-	{
-		if (seats[i].occupied == 1)
-		{
-			Player *player = seats[i].player;
-			if (player)
-			{
-				packet.val["players"][j]["seatid"] = player->seatid;
-				packet.val["players"][j]["uid"] = player->uid;
-				packet.val["players"][j]["name"] = player->name;
-				packet.val["players"][j]["rmb"] = player->rmb;
-				packet.val["players"][j]["money"] = player->money;
-				packet.val["players"][j]["total_board"] = player->total_board;
+    int j = 0;
+    for (int i = 0; i < seat_max; i++)
+    {
+        if (seats[i].occupied == 1)
+        {
+            Player *player = seats[i].player;
+            if (player)
+            {
+                packet.val["players"][j]["seatid"] = player->seatid;
+                packet.val["players"][j]["uid"] = player->uid;
+                packet.val["players"][j]["name"] = player->name;
+                packet.val["players"][j]["rmb"] = player->rmb;
+                packet.val["players"][j]["money"] = player->money;
+                packet.val["players"][j]["total_board"] = player->total_board;
                 packet.val["players"][j]["pay_total"] = player->pay_total;
                 packet.val["players"][j]["gang_hu_flag"] = seats[i].gang_hu_flag;
-                packet.val["players"][j]["horse_count"] = seats[i].horse_count;//算出来的鸡的个数
+                packet.val["players"][j]["horse_count"] = seats[i].horse_count; //算出来的鸡的个数
                 seats[i].total_zhong_horse += seats[i].horse_count;
                 packet.val["players"][j]["pao_hu_flag"] = seats[i].pao_hu_flag;
                 packet.val["players"][j]["forbid_hu"] = seats[i].forbid_hu;
@@ -1913,13 +1906,31 @@ int Table::game_end(int flag)
                 {
                     packet.val["players"][j]["jiao_pai_score"] = seats[i].jiao_pai_max_score;
                     packet.val["players"][j]["jiao_pai_type"] = seats[i].jiao_pai_max_type;
+
+                    std::map<int, int>::iterator it;
+                    for (it = score_from_players_item_count[i].begin(); it != score_from_players_item_count[i].end(); it++)
+                    {
+                        if (it->first == JIAO_PAI_TYPE)
+                            packet.val["players"][j]["jin_fen_ge_shu"].append(it->second);
+                    }
+
+                    for (it = score_to_players_item_count[i].begin(); it != score_to_players_item_count[i].end(); it++)
+                    {
+                        if (it->first == JIAO_PAI_TYPE)
+                            packet.val["players"][j]["chu_fen_ge_shu"].append(it->second);
+                    }
                 }
+                else
+                {
+                    map_to_json_array(score_from_players_item_count[i], packet.val["players"][j], "jin_fen_ge_shu");
+                    map_to_json_array(score_to_players_item_count[i], packet.val["players"][j], "chu_fen_ge_shu");
+                }
+
                 //进分
                 map_to_json_array(score_from_players_item_total[i], packet.val["players"][j], "jin_fen_lei_xing", "jin_fen");
-                map_to_json_array(score_from_players_item_count[i], packet.val["players"][j], "jin_fen_ge_shu");
+
                 //出分
                 map_to_json_array(score_to_players_item_total[i], packet.val["players"][j], "chu_fen_lei_xing", "chu_fen");
-                map_to_json_array(score_to_players_item_count[i], packet.val["players"][j], "chu_fen_ge_shu");
 
                 packet.val["players"][j]["hu_pai_lei_xing"] = seats[i].hu_pai_lei_xing.c_str();
 
@@ -1939,24 +1950,24 @@ int Table::game_end(int flag)
                     //     packet.val["players"][j]["zhong_horse"].append(0);
                     // }
                     packet.val["players"][j]["display_horse"] = 0;
-                }            
+                }
 
                 for (unsigned int z = 0; z < seats[i].obsorb_seats.size(); z++)
                 {
                     packet.val["players"][j]["obsorb_seats"].append(seats[i].obsorb_seats[z]);
                 }
-				
-				if (seats[i].seatid == win_seatid)
-				{
-					packet.val["players"][j]["card_type"] = seats[i].hole_cards.card_type;
+
+                if (seats[i].seatid == win_seatid)
+                {
+                    packet.val["players"][j]["card_type"] = seats[i].hole_cards.card_type;
                     string desc = format_card_desc(seats[i].hole_cards.card_type, i);
                     packet.val["players"][j]["card_desc"] = desc.c_str();
-					packet.val["players"][j]["win"] = 1;
+                    packet.val["players"][j]["win"] = 1;
 
-					for (unsigned int k = 0; k < seats[i].hole_cards.oldcards.size(); k++)
-					{
-						packet.val["players"][j]["holes"].append(seats[i].hole_cards.oldcards[k].value);
-					}
+                    for (unsigned int k = 0; k < seats[i].hole_cards.oldcards.size(); k++)
+                    {
+                        packet.val["players"][j]["holes"].append(seats[i].hole_cards.oldcards[k].value);
+                    }
 
                     if (seats[i].hole_cards.cards.size() % 3 != 2)
                     {
@@ -1981,12 +1992,11 @@ int Table::game_end(int flag)
                         packet.val["players"][j]["gang_count"].append(seats[i].gang_count[k]);
                     }
                     packet.val["players"][j]["bet"] = seats[i].bet;
+                }
+                else
+                {
 
-				}
-				else
-				{
-
-                    if ( (seats[i].gang_hu_flag == 1 && gang_hu_count > 1) || (seats[i].pao_hu_flag == 1 && pao_hu_count > 1))
+                    if ((seats[i].gang_hu_flag == 1 && gang_hu_count > 1) || (seats[i].pao_hu_flag == 1 && pao_hu_count > 1))
                     {
                         packet.val["players"][j]["card_type"] = seats[i].hole_cards.card_type;
                         string desc = format_card_desc(seats[i].hole_cards.card_type, i);
@@ -1999,13 +2009,13 @@ int Table::game_end(int flag)
                         packet.val["players"][j]["card_desc"] = "";
                         packet.val["players"][j]["win"] = 0;
                     }
-					
-					for (unsigned int k = 0; k < seats[i].hole_cards.oldcards.size(); k++)
-					{
-						packet.val["players"][j]["holes"].append(seats[i].hole_cards.oldcards[k].value);
-					}
 
-                    if ( (seats[i].gang_hu_flag == 1 && gang_hu_count > 1) || (seats[i].pao_hu_flag == 1 && pao_hu_count > 1))
+                    for (unsigned int k = 0; k < seats[i].hole_cards.oldcards.size(); k++)
+                    {
+                        packet.val["players"][j]["holes"].append(seats[i].hole_cards.oldcards[k].value);
+                    }
+
+                    if ((seats[i].gang_hu_flag == 1 && gang_hu_count > 1) || (seats[i].pao_hu_flag == 1 && pao_hu_count > 1))
                     {
                         packet.val["players"][j]["holes"].append(hu_card);
                     }
@@ -2029,12 +2039,12 @@ int Table::game_end(int flag)
                     }
 
                     packet.val["players"][j]["bet"] = seats[i].bet;
-				}
-		
-				j++;
-			}
-		}
-	}
+                }
+
+                j++;
+            }
+        }
+    }
 
     int init_money = zjh.conf["tables"]["init_money"].asInt();
     packet.val["flag"] = 0;
@@ -2046,11 +2056,14 @@ int Table::game_end(int flag)
     {
         packet.val["flag"] = 1;
         j = 0;
-        for (int i = 0; i < seat_max; i++) {
-            if (seats[i].occupied == 1) {
+        for (int i = 0; i < seat_max; i++)
+        {
+            if (seats[i].occupied == 1)
+            {
                 Player *player = seats[i].player;
                 Seat &seat = seats[i];
-                if (player) {
+                if (player)
+                {
                     packet.val["players1"][j]["seatid"] = player->seatid;
                     packet.val["players1"][j]["uid"] = player->uid;
                     packet.val["players1"][j]["name"] = player->name;
@@ -2079,214 +2092,214 @@ int Table::game_end(int flag)
         insert_flow_round_record();
         game_end_flag = 1;
     }
-	packet.end();
-	broadcast(NULL, packet.tostring());
+    packet.end();
+    broadcast(NULL, packet.tostring());
 
     struct timeval btime, etime;
     gettimeofday(&btime, NULL);
-	replay.record_write();
-	replay.save(ts,ttid);
+    replay.record_write();
+    replay.save(ts, ttid);
     gettimeofday(&etime, NULL);
     mjlog.debug("game end diff time %d usec\n", (etime.tv_sec - btime.tv_sec) * 1000000 + etime.tv_usec - btime.tv_usec);
 
     //for (int i = 0; i < seat_max; i++)
-	//{
-	//	seats[i].reset();
+    //{
+    //	seats[i].reset();
     //}
 
     //reset();
 
-	ev_timer_again(zjh.loop, &preready_timer);
+    ev_timer_again(zjh.loop, &preready_timer);
 
-	return 0;
+    return 0;
 }
 
 int Table::handler_fold(Player *player)
 {
-	Seat &seat = seats[player->seatid];
+    Seat &seat = seats[player->seatid];
 
-	if (seat.betting == 0)
-	{
-		mjlog.error("handler_fold seat betting[0] uid[%d] tid[%d].\n",
-				player->uid, tid);
-		return -1;
-	}
+    if (seat.betting == 0)
+    {
+        mjlog.error("handler_fold seat betting[0] uid[%d] tid[%d].\n",
+                    player->uid, tid);
+        return -1;
+    }
 
-	//lose_update(seat.player);
-	seat.betting = 0;
+    //lose_update(seat.player);
+    seat.betting = 0;
 
-	return 0;
+    return 0;
 }
 
 int Table::handler_logout(Player *player)
 {
-	// if (state == BETTING)
-	// {
-	// 	Seat &seat = seats[player->seatid];
-	// 	if (seat.betting == 1)
-	// 	{
-	// 		handler_fold(player);
-	// 		int ret = test_game_end();
-	// 		if (ret < 0)
-	// 		{
-	// 			if (player->seatid == cur_seat)
-	// 			{
-	// 				count_next_bet();
-	// 			}
-	// 		}
-	// 	}
-	// }
+    // if (state == BETTING)
+    // {
+    // 	Seat &seat = seats[player->seatid];
+    // 	if (seat.betting == 1)
+    // 	{
+    // 		handler_fold(player);
+    // 		int ret = test_game_end();
+    // 		if (ret < 0)
+    // 		{
+    // 			if (player->seatid == cur_seat)
+    // 			{
+    // 				count_next_bet();
+    // 			}
+    // 		}
+    // 	}
+    // }
 
-	Jpacket packet;
-	packet.val["cmd"] = SERVER_LOGOUT_SUCC_BC;
-	packet.val["uid"] = player->uid;
-	packet.val["seatid"] = player->seatid;
-	packet.val["type"] = player->logout_type;
-	packet.end();
-	broadcast(NULL, packet.tostring());
+    Jpacket packet;
+    packet.val["cmd"] = SERVER_LOGOUT_SUCC_BC;
+    packet.val["uid"] = player->uid;
+    packet.val["seatid"] = player->seatid;
+    packet.val["type"] = player->logout_type;
+    packet.end();
+    broadcast(NULL, packet.tostring());
 
-	return 0;
+    return 0;
 }
 
 int Table::handler_chat(Player *player)
 {
-	Json::Value &val = player->client->packet.tojson();
+    Json::Value &val = player->client->packet.tojson();
 
-	Jpacket packet;
-	packet.val["cmd"] = SERVER_CHAT_BC;
-	packet.val["uid"] = player->uid;
-	packet.val["seatid"] = player->seatid;
-	packet.val["text"] = val["text"];
-	packet.val["chatid"] = val["chatid"];
+    Jpacket packet;
+    packet.val["cmd"] = SERVER_CHAT_BC;
+    packet.val["uid"] = player->uid;
+    packet.val["seatid"] = player->seatid;
+    packet.val["text"] = val["text"];
+    packet.val["chatid"] = val["chatid"];
     packet.val["sex"] = val["sex"];
-	packet.end();
-	broadcast(NULL, packet.tostring());
+    packet.end();
+    broadcast(NULL, packet.tostring());
 
     //player->noplay_count = 0;
-	return 0;
+    return 0;
 }
 
 int Table::handler_face(Player *player)
 {
-	Json::Value &val = player->client->packet.tojson();
+    Json::Value &val = player->client->packet.tojson();
 
-	Jpacket packet;
-	packet.val["cmd"] = SERVER_FACE_BC;
-	packet.val["uid"] = player->uid;
-	packet.val["seatid"] = player->seatid;
-	packet.val["faceid"] = val["faceid"];
-	packet.end();
-	broadcast(NULL, packet.tostring());
+    Jpacket packet;
+    packet.val["cmd"] = SERVER_FACE_BC;
+    packet.val["uid"] = player->uid;
+    packet.val["seatid"] = player->seatid;
+    packet.val["faceid"] = val["faceid"];
+    packet.end();
+    broadcast(NULL, packet.tostring());
 
     //player->noplay_count = 0;
 
-	return 0;
+    return 0;
 }
 
 int Table::handler_interFace(Player *player)
 {
-	Json::Value &val = player->client->packet.tojson();
+    Json::Value &val = player->client->packet.tojson();
 
-	Jpacket packet;
-	packet.val["cmd"] = SERVER_INTERFACE_BC;
-	packet.val["uid"] = player->uid;
-	packet.val["fromid"] = player->seatid;
-	packet.val["toid"] = val["toid"];
-	packet.val["faceid"] = val["faceid"];
-	packet.end();
-	broadcast(NULL, packet.tostring());
+    Jpacket packet;
+    packet.val["cmd"] = SERVER_INTERFACE_BC;
+    packet.val["uid"] = player->uid;
+    packet.val["fromid"] = player->seatid;
+    packet.val["toid"] = val["toid"];
+    packet.val["faceid"] = val["faceid"];
+    packet.end();
+    broadcast(NULL, packet.tostring());
 
     //player->noplay_count = 0;
-	return 0;
+    return 0;
 }
 
 int Table::handler_player_info(Player *player)
 {
-	int ret = 0;
+    int ret = 0;
     //player->noplay_count = 0;
-	ret = player->update_info();
-	if (ret < 0)
-	{
-		mjlog.error("handler_player_info update_info error.\n");
-		return -1;
-	}
+    ret = player->update_info();
+    if (ret < 0)
+    {
+        mjlog.error("handler_player_info update_info error.\n");
+        return -1;
+    }
 
-	if (state == BETTING)
-	{
-		Seat &seat = seats[player->seatid];
-		if (seat.betting == 1)
-		{
-			player->money -= seat.bet;
-			mjlog.info("handler_player_info o uid[%d] money[%d] bet[%d].\n",
-					player->uid, player->money, seat.bet);
-		}
-	}
+    if (state == BETTING)
+    {
+        Seat &seat = seats[player->seatid];
+        if (seat.betting == 1)
+        {
+            player->money -= seat.bet;
+            mjlog.info("handler_player_info o uid[%d] money[%d] bet[%d].\n",
+                       player->uid, player->money, seat.bet);
+        }
+    }
 
-	Jpacket packet;
-	packet.val["cmd"] = SERVER_PLAYER_INFO_BC;
-	packet.val["uid"] = player->uid;
-	packet.val["seatid"] = player->seatid;
-	packet.val["money"] = player->money;
-	packet.val["rmb"] = player->rmb;
-	packet.val["total_board"] = player->total_board;
+    Jpacket packet;
+    packet.val["cmd"] = SERVER_PLAYER_INFO_BC;
+    packet.val["uid"] = player->uid;
+    packet.val["seatid"] = player->seatid;
+    packet.val["money"] = player->money;
+    packet.val["rmb"] = player->rmb;
+    packet.val["total_board"] = player->total_board;
 
-	packet.end();
-	broadcast(NULL, packet.tostring());
+    packet.end();
+    broadcast(NULL, packet.tostring());
 
-	mjlog.info("handler_player_info uid[%d] seatid[%d] money[%d] tid[%d].\n",
-			player->uid, player->seatid, player->money, tid);
+    mjlog.info("handler_player_info uid[%d] seatid[%d] money[%d] tid[%d].\n",
+               player->uid, player->seatid, player->money, tid);
 
-	return 0;
+    return 0;
 }
 
 int Table::handler_prop(Player *player)
 {
-	Json::Value &val = player->client->packet.tojson();
-	int action = val["action"].asInt();
+    Json::Value &val = player->client->packet.tojson();
+    int action = val["action"].asInt();
 
-	if (type != 0)
-	{
-		mjlog.error("handler_prop error uid[%d] money[%d] is not in prop\n",
-				player->uid, player->money);
-		return 0;
-	}
+    if (type != 0)
+    {
+        mjlog.error("handler_prop error uid[%d] money[%d] is not in prop\n",
+                    player->uid, player->money);
+        return 0;
+    }
 
-	if (state != BETTING)
-	{
-		mjlog.error("handler_prop state[%d] is not betting tid[%d]\n", state,
-				tid);
-		return -1;
-	}
+    if (state != BETTING)
+    {
+        mjlog.error("handler_prop state[%d] is not betting tid[%d]\n", state,
+                    tid);
+        return -1;
+    }
 
-	Seat &seat = seats[player->seatid];
-	if (seat.player != player)
-	{
-		mjlog.error("handler_prop player is no match with seat.player\n");
-		return -1;
-	}
+    Seat &seat = seats[player->seatid];
+    if (seat.player != player)
+    {
+        mjlog.error("handler_prop player is no match with seat.player\n");
+        return -1;
+    }
 
-	mjlog.info("handler_prop succ. uid[%d] seatid[%d] action[%d] tid[%d].\n",
-			player->uid, player->seatid, action, tid);
-	return 0;
+    mjlog.info("handler_prop succ. uid[%d] seatid[%d] action[%d] tid[%d].\n",
+               player->uid, player->seatid, action, tid);
+    return 0;
 }
 
 void Table::handler_prop_error(Player *player, int action)
 {
-	Jpacket packet;
-	packet.val["cmd"] = SERVER_PROP_ERR_UC;
-	packet.val["uid"] = player->uid;
-	packet.val["action"] = action;
-	packet.end();
-	unicast(player, packet.tostring());
+    Jpacket packet;
+    packet.val["cmd"] = SERVER_PROP_ERR_UC;
+    packet.val["uid"] = player->uid;
+    packet.val["action"] = action;
+    packet.end();
+    unicast(player, packet.tostring());
 }
 
 void Table::handler_bet_error(Player *player, int action)
 {
-	Jpacket packet;
-	packet.val["cmd"] = SERVER_BET_ERR_UC;
-	packet.val["uid"] = player->uid;
-	packet.val["action"] = action;
-	packet.val["chu_seat"] = chu_seat;
+    Jpacket packet;
+    packet.val["cmd"] = SERVER_BET_ERR_UC;
+    packet.val["uid"] = player->uid;
+    packet.val["action"] = action;
+    packet.val["chu_seat"] = chu_seat;
 
     Seat &seat = seats[player->seatid];
 
@@ -2296,32 +2309,32 @@ void Table::handler_bet_error(Player *player, int action)
     for (; lit != seat.hole_cards.discard_cards.end(); lit++)
     {
         packet.val["discard_holes"].append(lit->value);
-    }      
+    }
 
-	packet.end();
-	unicast(player, packet.tostring());
+    packet.end();
+    unicast(player, packet.tostring());
 }
 
 int Table::next_betting_seat(int pos)
 {
-	int cur = pos;
+    int cur = pos;
 
-	for (int i = 0; i < seat_max; i++)
-	{
-		cur++;
-		if (cur >= seat_max)
-			cur = 0;
+    for (int i = 0; i < seat_max; i++)
+    {
+        cur++;
+        if (cur >= seat_max)
+            cur = 0;
 
-		if (seats[cur].betting == 1)
-		{
-			mjlog.debug("cur is betting seat[%d]\n", cur);
-			return cur;
-		}
-	}
+        if (seats[cur].betting == 1)
+        {
+            mjlog.debug("cur is betting seat[%d]\n", cur);
+            return cur;
+        }
+    }
 
-	mjlog.error("error active player\n");
+    mjlog.error("error active player\n");
 
-	return -1;
+    return -1;
 }
 
 int Table::next_player_seat()
@@ -2338,8 +2351,8 @@ int Table::next_player_seat()
             Seat &seat = seats[next];
             if (seats[next].ready != 1)
             {
-				continue;
-			}
+                continue;
+            }
 
             if (seat.hole_cards.permit_hu(last_card.value) && seat.forbid_hu != 1)
             {
@@ -2349,17 +2362,26 @@ int Table::next_player_seat()
                     continue;
                 }
 
+                if (seat.gang_count[1] == 0 &&                        //没有转弯豆（碰杠）是不能胡牌
+                    seats[chu_seat].last_actions[1] != PLAYER_GANG && //如果被胡玩家之前的操作是杠,则杠之后出的牌是可以不用碰杠也可以胡
+                    seats[chu_seat].last_actions[0] != PLAYER_GANG    //如果被胡玩家的当前操作是碰杠，则这个杠可以被抢胡，不需要碰杠也可以胡
+                    )
+                {
+                    mjlog.debug("mei you zhuang wan dou\n");
+                    continue;
+                }
+
                 seat.hole_cards.analysis_card_type(last_card.value);
                 //if (seat.hole_cards.card_type == CARD_TYPE_PING_HU && fang_pao == 0)
                 //{
-                    //if ((!(seats[chu_seat].hole_cards.cards.size() == 1 && seats[chu_seat].hole_cards.an_gang_count == 0))
-                        //&& (!(seats[chu_seat].last_actions[1] == PLAYER_GANG && seats[chu_seat].last_actions[0] == PLAYER_CHU))
-                        //&& (!(deck.permit_get() == 0)))
-                    //{
-                        //mjlog.debug("cur_seat[%d], next hu seat[%d], card_type %d, last card %d\n",
-                                  //cur_seat, next, seat.hole_cards.card_type, last_card.value);
-                        //continue;
-                    //}         
+                //if ((!(seats[chu_seat].hole_cards.cards.size() == 1 && seats[chu_seat].hole_cards.an_gang_count == 0))
+                //&& (!(seats[chu_seat].last_actions[1] == PLAYER_GANG && seats[chu_seat].last_actions[0] == PLAYER_CHU))
+                //&& (!(deck.permit_get() == 0)))
+                //{
+                //mjlog.debug("cur_seat[%d], next hu seat[%d], card_type %d, last card %d\n",
+                //cur_seat, next, seat.hole_cards.card_type, last_card.value);
+                //continue;
+                //}
                 //}
                 hu_card = last_card.value;
                 mjlog.debug("cur_seat[%d], next hu seat[%d]\n", cur_seat, next);
@@ -2384,8 +2406,8 @@ int Table::next_player_seat()
             int next = (cur_seat + i) % seat_max;
             if (seats[next].ready != 1)
             {
-				continue;
-			}
+                continue;
+            }
 
             vector<int> &cards = seats[next].guo_peng_cards;
             if (find(cards.begin(), cards.end(), last_card.value) != cards.end())
@@ -2394,11 +2416,10 @@ int Table::next_player_seat()
                 continue;
             }
 
-            if (seats[next].hole_cards.permit_peng(last_card.value)
-                || seats[next].hole_cards.permit_gang(last_card.value))
+            if (seats[next].hole_cards.permit_peng(last_card.value) || seats[next].hole_cards.permit_gang(last_card.value))
             {
                 mjlog.debug("cur_seat[%d], next peng gang seat[%d]\n", cur_seat, next);
-                return next;        
+                return next;
             }
         }
     }
@@ -2415,12 +2436,11 @@ int Table::next_player_seat()
                     continue;
                 }
 
-                if (seats[next].hole_cards.permit_hu(last_gang_card.value)
-					&& seats[next].forbid_hu != 1)
+                if (seats[next].hole_cards.permit_hu(last_gang_card.value) && seats[next].forbid_hu != 1)
                 {
                     // 抢杠胡
                     mjlog.debug("cur_seat[%d], next hu seat[%d]\n", cur_seat, next);
-                    
+
                     if (first_hu_seat == -1)
                     {
                         first_hu_seat = next;
@@ -2456,14 +2476,13 @@ int Table::next_player_seat()
                 {
                     continue;
                 }
-                
+
                 if (seats[next].handler_flag == 1 || next == wait_handler_seat)
                 {
                     continue;
                 }
 
-                if (seats[next].hole_cards.permit_peng(last_card.value)
-                    || seats[next].hole_cards.permit_gang(last_card.value))
+                if (seats[next].hole_cards.permit_peng(last_card.value) || seats[next].hole_cards.permit_gang(last_card.value))
                 {
                     mjlog.debug("cur_seat[%d], next peng gang seat[%d]\n", cur_seat, next);
                     return next;
@@ -2501,55 +2520,54 @@ int Table::next_player_seat()
     }
 }
 
-
 int Table::prev_betting_seat(int pos)
 {
-	int cur = pos;
+    int cur = pos;
 
-	for (int i = 0; i < seat_max; i++)
-	{
-		cur--;
-		if (cur < 0)
-			cur = seat_max - 1;
+    for (int i = 0; i < seat_max; i++)
+    {
+        cur--;
+        if (cur < 0)
+            cur = seat_max - 1;
 
-		if (seats[cur].betting == 1)
-		{
-			mjlog.debug("cur is betting seat[%d]\n", cur);
-			return cur;
-		}
-	}
+        if (seats[cur].betting == 1)
+        {
+            mjlog.debug("cur is betting seat[%d]\n", cur);
+            return cur;
+        }
+    }
 
-	mjlog.error("error active player\n");
+    mjlog.error("error active player\n");
 
-	return -1;
+    return -1;
 }
 
 int Table::count_betting_seats()
 {
-	int count = 0;
+    int count = 0;
 
-	for (int i = 0; i < seat_max; i++)
-	{
-		if (seats[i].betting == 1)
-		{
-			count++;
-		}
-	}
+    for (int i = 0; i < seat_max; i++)
+    {
+        if (seats[i].betting == 1)
+        {
+            count++;
+        }
+    }
 
-	return count;
+    return count;
 }
 
 int Table::get_last_betting()
 {
-	for (int i = 0; i < seat_max; i++)
-	{
-		if (seats[i].betting == 1)
-		{
-			return i;
-		}
-	}
+    for (int i = 0; i < seat_max; i++)
+    {
+        if (seats[i].betting == 1)
+        {
+            return i;
+        }
+    }
 
-	return -1;
+    return -1;
 }
 
 /*  type: 1、钻石 2、金币 3、踢人卡 4、换牌 5、禁比卡 6、四倍卡 7、八倍卡 8、座驾 9、兑换券
@@ -2561,14 +2579,14 @@ int Table::get_last_betting()
 */
 int Table::insert_flow_log(int ts, int uid, string ip, int pos, int vid, int zid, int tid, int type, int flag, int num, int anum)
 {
-	Jpacket packet;
+    Jpacket packet;
     packet.val["roomid"] = ttid;
     packet.val["masterid"] = owner_uid;
 
     int index = 0;
     for (int i = 0; i < seat_max; i++)
     {
-        Player* player = seats[i].player;
+        Player *player = seats[i].player;
 
         int occ = 1;
         if (player == NULL)
@@ -2608,19 +2626,18 @@ int Table::insert_flow_log(int ts, int uid, string ip, int pos, int vid, int zid
     if (ret < 0)
     {
         mjlog.error("insert rmb_flow_record %s", str.c_str());
-        return - 1;
+        return -1;
     }
-	return 0;
+    return 0;
 }
 
 int Table::handler_send_gift_req(Player *player)
-{ 
+{
     return 0;
 }
 
 void Table::send_result_to_robot()
 {
-   
 }
 
 void Table::init_dealer()
@@ -2630,7 +2647,7 @@ void Table::init_dealer()
     {
         for (int i = 0; i < seat_max; i++)
         {
-            if(seats[i].ready == 0)
+            if (seats[i].ready == 0)
             {
                 continue;
             }
@@ -2644,11 +2661,10 @@ void Table::init_dealer()
         dealer = random_dealer();
         seats[dealer].lian_zhuang_cnt = 1;
         return;
-	}
-
+    }
 
     //三人胡了，则放炮的玩家作庄
-    if(gang_hu_seat > -1 && gang_hu_count > 2)
+    if (gang_hu_seat > -1 && gang_hu_count > 2)
     {
         if (dealer == gang_hu_seat)
             seats[dealer].lian_zhuang_cnt++;
@@ -2658,23 +2674,23 @@ void Table::init_dealer()
         return;
     }
 
-    if(pao_hu_seat > -1 && pao_hu_count > 2)
+    if (pao_hu_seat > -1 && pao_hu_count > 2)
     {
         if (dealer == pao_hu_seat)
             seats[dealer].lian_zhuang_cnt++;
         else
             seats[dealer].lian_zhuang_cnt = 1;
         dealer = pao_hu_seat;
-        return ;
-	}
+        return;
+    }
 
     //二人胡了,第一人胡的玩家作庄
-	if(gang_hu_seat > -1 && gang_hu_count == 2)
-	{
+    if (gang_hu_seat > -1 && gang_hu_count == 2)
+    {
         int first_hu = gang_hu_seat;
         for (int i = 1; i < seat_max; i++)
         {
-            first_hu = (gang_hu_seat+i) % seat_max;
+            first_hu = (gang_hu_seat + i) % seat_max;
             if (seats[first_hu].occupied != 1)
             {
                 continue;
@@ -2690,13 +2706,13 @@ void Table::init_dealer()
             dealer = first_hu;
         }
         return;
-	}
-    if(pao_hu_seat > -1 && pao_hu_count == 2)
+    }
+    if (pao_hu_seat > -1 && pao_hu_count == 2)
     {
         int first_hu = pao_hu_seat;
         for (int i = 1; i < seat_max; i++)
         {
-            first_hu = (pao_hu_seat+i) % seat_max;
+            first_hu = (pao_hu_seat + i) % seat_max;
             if (seats[first_hu].occupied != 1)
             {
                 continue;
@@ -2711,7 +2727,7 @@ void Table::init_dealer()
                 seats[dealer].lian_zhuang_cnt = 1;
             dealer = first_hu;
         }
-        return ;
+        return;
     }
 
     // 谁胡谁做庄
@@ -2725,21 +2741,21 @@ void Table::init_dealer()
         hu_seat = -1;
         return;
     }
-	// 荒庄
+    // 荒庄
     //没人叫牌，庄家连庄
     if (jiao_pai_cnt == 0)
     {
         seats[dealer].lian_zhuang_cnt++;
-        return ;
+        return;
     }
     //都叫牌，庄家连庄
-    if (jiao_pai_cnt == max_ready_players )
+    if (jiao_pai_cnt == max_ready_players)
     {
         seats[dealer].lian_zhuang_cnt++;
-        return ;
+        return;
     }
     //有3家叫了且只有一家未叫，则未叫者接庄
-    if (jiao_pai_cnt == 3 )
+    if (jiao_pai_cnt == 3)
     {
         for (int i = 1; i < seat_max; i++)
         {
@@ -2756,13 +2772,13 @@ void Table::init_dealer()
                 dealer = i;
             }
         }
-        return ;
+        return;
     }
     //有人叫牌，有人不叫牌。在叫牌者中，有庄家则连庄。没庄家则离庄家最近的下家接庄;
     int next = dealer;
-	for (int i = 1; i < seat_max; i++)
-	{
-        next = (dealer+i) % seat_max;
+    for (int i = 1; i < seat_max; i++)
+    {
+        next = (dealer + i) % seat_max;
         if (seats[next].occupied != 1)
         {
             continue;
@@ -2779,13 +2795,15 @@ void Table::init_dealer()
     return;
 }
 
-int Table::handler_chi(Player* player)
+int Table::handler_chi(Player *player)
 {
     Json::Value &val = player->client->packet.tojson();
     Seat &seat = seats[player->seatid];
-	int action = val["action"].asInt();
+    int action = val["action"].asInt();
     int card = val["card"].asInt();
-    int pattern[3] = {0, };
+    int pattern[3] = {
+        0,
+    };
     int size = val["pattern"].size();
 
     for (int index = 0; index < size; index++)
@@ -2793,44 +2811,44 @@ int Table::handler_chi(Player* player)
         pattern[index] = val["pattern"][index].asInt();
     }
 
-	if (seat.betting == 0)
-	{
-		handler_bet_error(player, action);
-		mjlog.error("handler_chi error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
-				player->uid, player->seatid, tid);
-		return -1;
-	}
+    if (seat.betting == 0)
+    {
+        handler_bet_error(player, action);
+        mjlog.error("handler_chi error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
+                    player->uid, player->seatid, tid);
+        return -1;
+    }
 
     if (cur_seat != player->seatid)
     {
         handler_bet_error(player, action);
-		mjlog.error("handler_chi seat error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
-				player->uid, player->seatid, tid);
-		return -1;
+        mjlog.error("handler_chi seat error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
+                    player->uid, player->seatid, tid);
+        return -1;
     }
 
     if (last_action != PLAYER_CHU && last_action != PLAYER_GUO)
     {
         handler_bet_error(player, action);
-		mjlog.error("handler_chi action  error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
-				player->uid, player->seatid, tid);
-		return -1;
+        mjlog.error("handler_chi action  error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
+                    player->uid, player->seatid, tid);
+        return -1;
     }
 
     if (last_card.value != card)
     {
         handler_bet_error(player, action);
-		mjlog.error("handler_chi value  error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
-				player->uid, player->seatid, tid);
-		return -1;
+        mjlog.error("handler_chi value  error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
+                    player->uid, player->seatid, tid);
+        return -1;
     }
 
     if (actions[NOTICE_CHI] != 1)
     {
         handler_bet_error(player, action);
-		mjlog.error("handler_chi notice error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
-				player->uid, player->seatid, tid);
-		return -1;
+        mjlog.error("handler_chi notice error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
+                    player->uid, player->seatid, tid);
+        return -1;
     }
 
     last_action = PLAYER_CHI;
@@ -2849,22 +2867,22 @@ int Table::handler_chi(Player* player)
     seat.actions.push_front(action);
 
     Jpacket packet;
-	packet.val["cmd"] = SERVER_BET_SUCC_BC;
-	packet.val["seatid"] = player->seatid;
-	packet.val["uid"] = player->uid;
-	packet.val["action"] = action;
+    packet.val["cmd"] = SERVER_BET_SUCC_BC;
+    packet.val["seatid"] = player->seatid;
+    packet.val["uid"] = player->uid;
+    packet.val["action"] = action;
     packet.val["card"] = card;
     packet.val["pattern"] = val["pattern"];
     packet.val["chu_seat"] = chu_seat;
     vector_to_json_array(seat.hole_cards.cards, packet, "holes");
-	packet.end();
-	unicast(player, packet.tostring());
+    packet.end();
+    unicast(player, packet.tostring());
 
     Jpacket packet1;
-	packet1.val["cmd"] = SERVER_BET_SUCC_BC;
-	packet1.val["seatid"] = player->seatid;
-	packet1.val["uid"] = player->uid;
-	packet1.val["action"] = action;
+    packet1.val["cmd"] = SERVER_BET_SUCC_BC;
+    packet1.val["seatid"] = player->seatid;
+    packet1.val["uid"] = player->uid;
+    packet1.val["action"] = action;
     packet1.val["card"] = card;
     packet1.val["chu_seat"] = chu_seat;
     packet1.val["pattern"] = val["pattern"];
@@ -2873,73 +2891,73 @@ int Table::handler_chi(Player* player)
     {
         packet1.val["holes"].append(0);
     }
-	packet1.end();
-	broadcast(player, packet1.tostring());
+    packet1.end();
+    broadcast(player, packet1.tostring());
 
     return 0;
 }
 
-int Table::handler_chu(Player* player)
+int Table::handler_chu(Player *player)
 {
     Json::Value &val = player->client->packet.tojson();
     Seat &seat = seats[player->seatid];
-	int action = val["action"].asInt();
-    int card  = val["card"].asInt();
-    
-	if (seat.betting == 0)
-	{
-		handler_bet_error(player, action);
-		mjlog.error("handler_chu error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
-				player->uid, player->seatid, tid);
-		return -1;
-	}
+    int action = val["action"].asInt();
+    int card = val["card"].asInt();
+
+    if (seat.betting == 0)
+    {
+        handler_bet_error(player, action);
+        mjlog.error("handler_chu error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
+                    player->uid, player->seatid, tid);
+        return -1;
+    }
 
     if (player->seatid != cur_seat)
     {
         handler_bet_error(player, action);
-		mjlog.error("handler_chu seat error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
-				player->uid, player->seatid, tid);
-		return -1;
+        mjlog.error("handler_chu seat error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
+                    player->uid, player->seatid, tid);
+        return -1;
     }
 
     if (!seat.hole_cards.has_card(card))
     {
         handler_bet_error(player, action);
-		mjlog.error("handler_chu card error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
-				player->uid, player->seatid, tid);
-		return -1;
+        mjlog.error("handler_chu card error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
+                    player->uid, player->seatid, tid);
+        return -1;
     }
 
-    if (seat.ting == 1 &&  card != seat.hole_cards.last_card.value)
+    if (seat.ting == 1 && card != seat.hole_cards.last_card.value)
     {
         handler_bet_error(player, action);
-		mjlog.error("handler_chu card error, because has ting. betting[0] uid[%d] seatid[%d] tid[%d].\n",
-				player->uid, player->seatid, tid);
-		return -1;
+        mjlog.error("handler_chu card error, because has ting. betting[0] uid[%d] seatid[%d] tid[%d].\n",
+                    player->uid, player->seatid, tid);
+        return -1;
     }
 
     if (seat.robot_flag == 1)
     {
         handler_bet_error(player, action);
-		mjlog.error("handler_chu card error, because has robot flag. betting[0] uid[%d] seatid[%d] tid[%d].\n",
-				player->uid, player->seatid, tid);
-		return -1;
+        mjlog.error("handler_chu card error, because has robot flag. betting[0] uid[%d] seatid[%d] tid[%d].\n",
+                    player->uid, player->seatid, tid);
+        return -1;
     }
 
     if (cur_seat != player->seatid)
     {
         handler_bet_error(player, action);
-		mjlog.error("handler_chu seat error, because has robot flag. betting[0] uid[%d] seatid[%d] tid[%d].\n",
-				player->uid, player->seatid, tid);
-		return -1;
+        mjlog.error("handler_chu seat error, because has robot flag. betting[0] uid[%d] seatid[%d] tid[%d].\n",
+                    player->uid, player->seatid, tid);
+        return -1;
     }
 
     if (seat.hole_cards.cards.size() % 3 != 2)
     {
         handler_bet_error(player, action);
-		mjlog.error("handler_chu card size error, because has robot flag. betting[0] uid[%d] seatid[%d] tid[%d].\n",
-				player->uid, player->seatid, tid);
-		return -1;
+        mjlog.error("handler_chu card size error, because has robot flag. betting[0] uid[%d] seatid[%d] tid[%d].\n",
+                    player->uid, player->seatid, tid);
+        return -1;
     }
 
     last_action = PLAYER_CHU;
@@ -2950,51 +2968,56 @@ int Table::handler_chu(Player* player)
     seat.timeout_count = 0;
     Jpacket packet;
     Jpacket packet1;
-    if ( card == 1 && has_chong_feng_ji !=1 && has_ze_ren_ji != 1) //1条
+    if (card == 1 && has_chong_feng_ji != 1 && has_ze_ren_ji != 1) //1条
     {
         seat.has_chong_feng_ji = 1; //记录哪个玩家有冲锋鸡
-        has_chong_feng_ji = 1; //用于决断是否出现冲锋鸡。
+        has_chong_feng_ji = 1;      //用于决断是否出现冲锋鸡。
         packet.val["is_chong_feng_ji"] = 1;
+        packet1.val["is_chong_feng_ji"] = 1;
         seat.has_ze_ren_ji = 2; //为2的时候，表示下次谁碰了，冲锋鸡变成责任鸡
         has_ze_ren_ji = 2;
     }
     else
     {
-        if (card == 1 ) { //第2个幺鸡，即使碰了也不会变成责任鸡
-            if (has_ze_ren_ji == 2)
-            {
-                seat.has_ze_ren_ji = 0; //为0的时候，表示下次谁碰了，冲锋鸡不会变成责任鸡
-                has_ze_ren_ji = 0;
-            }
+        if (has_ze_ren_ji == 2)
+        {
+            seat.has_ze_ren_ji = 0; //为0的时候，表示下次谁碰了，冲锋鸡不会变成责任鸡
+            has_ze_ren_ji = 0;
+        }
+        if (card == 1)
+        {
             seat.has_yao_ji++;
             has_yao_ji++;
         }
         packet.val["is_chong_feng_ji"] = 0;
+        packet1.val["is_chong_feng_ji"] = 0;
     }
 
-    if ( wu_gu_ji == 1) 
+    if (wu_gu_ji == 1)
     {
         if (card == (2 * 16 + 8) && has_chong_feng_wu_gu_ji != 1 && has_wu_gu_ze_ren_ji != 1) //八筒
         {
             seat.has_chong_feng_wu_gu_ji = 1; //记录哪个玩家有乌骨鸡
             has_chong_feng_wu_gu_ji = 1;      //用于决断是否出现乌骨鸡。
             packet1.val["is_wu_gu_ji"] = 1;
+            packet.val["is_wu_gu_ji"] = 1;
             seat.has_wu_gu_ze_ren_ji = 2; //为2的时候，表示下次谁碰了，冲锋鸡变成责任鸡
             has_wu_gu_ze_ren_ji = 2;
         }
         else
         {
-            if (card == 2 * 16 + 8 )
-            {                                 //第2个八筒，即使碰了也不会变成责任鸡
-                if (has_wu_gu_ze_ren_ji == 2)
-                {
-                    seat.has_wu_gu_ze_ren_ji = 0; //为0的时候，表示下次谁碰了，乌骨鸡不会变成责任鸡
-                    has_wu_gu_ze_ren_ji = 0;
-                }
+            if (has_wu_gu_ze_ren_ji == 2) //第2个八筒，即使碰了也不会变成责任鸡
+            {
+                seat.has_wu_gu_ze_ren_ji = 0; //为0的时候，表示下次谁碰了，乌骨鸡不会变成责任鸡
+                has_wu_gu_ze_ren_ji = 0;
+            }
+            if (card == 2 * 16 + 8)
+            {
                 seat.has_wu_gu_ji++;
                 has_wu_gu_ji++;
             }
             packet1.val["is_wu_gu_ji"] = 0;
+            packet.val["is_wu_gu_ji"] = 0;
         }
     }
 
@@ -3029,8 +3052,7 @@ int Table::handler_chu(Player* player)
             continue;
         }
 
-        if (seats[i].hole_cards.permit_peng(card)
-            || seats[i].hole_cards.permit_gang(card))
+        if (seats[i].hole_cards.permit_peng(card) || seats[i].hole_cards.permit_gang(card))
         {
             pg_flag = 1;
             mjlog.debug("next peng gang seat is seat[%d]\n", i);
@@ -3046,10 +3068,10 @@ int Table::handler_chu(Player* player)
     wait_handle_action = action;
     wait_handler_seat = player->seatid;
 
-	packet.val["cmd"] = SERVER_BET_SUCC_BC;
-	packet.val["seatid"] = player->seatid;
-	packet.val["uid"] = player->uid;
-	packet.val["action"] = action;
+    packet.val["cmd"] = SERVER_BET_SUCC_BC;
+    packet.val["seatid"] = player->seatid;
+    packet.val["uid"] = player->uid;
+    packet.val["action"] = action;
     packet.val["card"] = card;
     packet.val["time_out"] = 0;
     packet.val["pg_flag"] = pg_flag;
@@ -3062,13 +3084,13 @@ int Table::handler_chu(Player* player)
         vector_to_json_array(seat.hole_cards.hu_cards, packet, "hu_cards");
     }
 
-	packet.end();
-	unicast(player, packet.tostring());
+    packet.end();
+    unicast(player, packet.tostring());
 
-	packet1.val["cmd"] = SERVER_BET_SUCC_BC;
-	packet1.val["seatid"] = player->seatid;
-	packet1.val["uid"] = player->uid;
-	packet1.val["action"] = action;
+    packet1.val["cmd"] = SERVER_BET_SUCC_BC;
+    packet1.val["seatid"] = player->seatid;
+    packet1.val["uid"] = player->uid;
+    packet1.val["action"] = action;
     packet1.val["card"] = card;
     packet1.val["time_out"] = 0;
     packet1.val["pg_flag"] = pg_flag;
@@ -3079,49 +3101,48 @@ int Table::handler_chu(Player* player)
     {
         packet1.val["holes"].append(0);
     }
-	packet1.end();
-	broadcast(player, packet1.tostring());
+    packet1.end();
+    broadcast(player, packet1.tostring());
     return 0;
-
 }
 
-int Table::handler_peng(Player* player)
+int Table::handler_peng(Player *player)
 {
     Json::Value &val = player->client->packet.tojson();
     Seat &seat = seats[player->seatid];
-	int action = val["action"].asInt();
+    int action = val["action"].asInt();
     int card = val["card"].asInt();
 
-	if (seat.betting == 0)
-	{
-		handler_bet_error(player, action);
-		mjlog.error("handler_peng error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
-				player->uid, player->seatid, tid);
-		return -1;
-	}
+    if (seat.betting == 0)
+    {
+        handler_bet_error(player, action);
+        mjlog.error("handler_peng error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
+                    player->uid, player->seatid, tid);
+        return -1;
+    }
 
     if (cur_seat != player->seatid)
     {
         handler_bet_error(player, action);
-		mjlog.error("handler_peng seat error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
-				player->uid, player->seatid, tid);
-		return -1;
+        mjlog.error("handler_peng seat error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
+                    player->uid, player->seatid, tid);
+        return -1;
     }
 
     if (last_action != PLAYER_CHU && last_action != PLAYER_GUO)
     {
         handler_bet_error(player, action);
-		mjlog.error("handler_peng action  error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
-				player->uid, player->seatid, tid);
-		return -1;
+        mjlog.error("handler_peng action  error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
+                    player->uid, player->seatid, tid);
+        return -1;
     }
 
     if (last_card.value != card || actions[NOTICE_PENG] != 1)
     {
         handler_bet_error(player, action);
-		mjlog.error("handler_peng value  error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
-				player->uid, player->seatid, tid);
-		return -1;
+        mjlog.error("handler_peng value  error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
+                    player->uid, player->seatid, tid);
+        return -1;
     }
 
     last_action = PLAYER_PENG;
@@ -3136,15 +3157,16 @@ int Table::handler_peng(Player* player)
 
     Jpacket packet;
     Jpacket packet1;
-    if ( seats[chu_seat].has_chong_feng_ji ==1 && seats[chu_seat].has_ze_ren_ji == 2 )
+    if (seats[chu_seat].has_chong_feng_ji == 1 && seats[chu_seat].has_ze_ren_ji == 2)
     {
         seats[chu_seat].has_ze_ren_ji = 1;
-        has_ze_ren_ji = 1; 
+        has_ze_ren_ji = 1;
         seats[chu_seat].has_chong_feng_ji = 0;
-        has_chong_feng_ji = 0; 
+        has_chong_feng_ji = 0;
         packet.val["ze_ren_ji"] = 1;
+        packet1.val["ze_ren_ji"] = 1;
     }
-    if ( wu_gu_ji == 1)
+    if (wu_gu_ji == 1)
     {
         if (seats[chu_seat].has_chong_feng_wu_gu_ji == 1 && seats[chu_seat].has_wu_gu_ze_ren_ji == 2)
         {
@@ -3153,12 +3175,13 @@ int Table::handler_peng(Player* player)
             seats[chu_seat].has_chong_feng_wu_gu_ji = 0;
             has_chong_feng_wu_gu_ji = 0;
             packet.val["wu_gu_ze_ren_ji"] = 1;
+            packet1.val["wu_gu_ze_ren_ji"] = 1;
         }
     }
 
     if (seat.peng_record.find(chu_seat) == seat.peng_record.end())
     {
-        seat.peng_record[chu_seat] = 1;      
+        seat.peng_record[chu_seat] = 1;
     }
     else
     {
@@ -3182,21 +3205,20 @@ int Table::handler_peng(Player* player)
         gang_hu_seat = -1;
     }
 
-
-	packet.val["cmd"] = SERVER_BET_SUCC_BC;
-	packet.val["seatid"] = player->seatid;
-	packet.val["uid"] = player->uid;
-	packet.val["action"] = action;
+    packet.val["cmd"] = SERVER_BET_SUCC_BC;
+    packet.val["seatid"] = player->seatid;
+    packet.val["uid"] = player->uid;
+    packet.val["action"] = action;
     packet.val["card"] = card;
     packet.val["chu_seat"] = chu_seat;
     vector_to_json_array(seat.hole_cards.cards, packet, "holes");
-	packet.end();
-	unicast(player, packet.tostring());
+    packet.end();
+    unicast(player, packet.tostring());
 
-	packet1.val["cmd"] = SERVER_BET_SUCC_BC;
-	packet1.val["seatid"] = player->seatid;
-	packet1.val["uid"] = player->uid;
-	packet1.val["action"] = action;
+    packet1.val["cmd"] = SERVER_BET_SUCC_BC;
+    packet1.val["seatid"] = player->seatid;
+    packet1.val["uid"] = player->uid;
+    packet1.val["action"] = action;
     packet1.val["card"] = card;
     packet1.val["chu_seat"] = chu_seat;
     int size = seat.hole_cards.cards.size();
@@ -3204,58 +3226,58 @@ int Table::handler_peng(Player* player)
     {
         packet1.val["holes"].append(0);
     }
-	packet1.end();
-	broadcast(player, packet1.tostring());
+    packet1.end();
+    broadcast(player, packet1.tostring());
 
     //if (seat.peng_record[chu_seat] == 1)
     //{
-        //broadcast_forbid_hu(seats[chu_seat].player, 1);
+    //broadcast_forbid_hu(seats[chu_seat].player, 1);
     //}
     //else if (seat.peng_record[chu_seat] == 2)
     //{
-        //broadcast_forbid_hu(seats[chu_seat].player, 2);
+    //broadcast_forbid_hu(seats[chu_seat].player, 2);
     //}
     //else if (seat.peng_record[chu_seat] == 3)
     //{
-        //seats[chu_seat].forbid_hu = 1;
-        //seats[chu_seat].forbided_seatid = player->seatid;
-        //forbid_hu_record[seat.seatid] = chu_seat;
-        //broadcast_forbid_hu(seats[chu_seat].player, 3);
+    //seats[chu_seat].forbid_hu = 1;
+    //seats[chu_seat].forbided_seatid = player->seatid;
+    //forbid_hu_record[seat.seatid] = chu_seat;
+    //broadcast_forbid_hu(seats[chu_seat].player, 3);
     //}
 
     return 0;
 }
 
-int Table::handler_gang(Player* player)
+int Table::handler_gang(Player *player)
 {
     Json::Value &val = player->client->packet.tojson();
     Seat &seat = seats[player->seatid];
-	int action = val["action"].asInt();
+    int action = val["action"].asInt();
     int card = val["card"].asInt();
     int gang_flag = val["gang_flag"].asInt();
 
-	if (seat.betting == 0)
-	{
-		handler_prop_error(player, action);
-		mjlog.error("handler_gang error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
-				player->uid, player->seatid, tid);
-		return -1;
-	}
+    if (seat.betting == 0)
+    {
+        handler_prop_error(player, action);
+        mjlog.error("handler_gang error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
+                    player->uid, player->seatid, tid);
+        return -1;
+    }
 
     if (cur_seat != player->seatid)
     {
         handler_prop_error(player, action);
-		mjlog.error("handler_gang seat error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
-				player->uid, player->seatid, tid);
-		return -1;
+        mjlog.error("handler_gang seat error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
+                    player->uid, player->seatid, tid);
+        return -1;
     }
 
     if (actions[NOTICE_GANG] != 1)
     {
         handler_bet_error(player, action);
-		mjlog.error("handler_gang notice error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
-				player->uid, player->seatid, tid);
-		return -1;
+        mjlog.error("handler_gang notice error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
+                    player->uid, player->seatid, tid);
+        return -1;
     }
 
     vector<Card>::iterator bit = seat.hole_cards.gang_cards.begin();
@@ -3264,9 +3286,9 @@ int Table::handler_gang(Player* player)
     if (find(bit, eit, card) == eit)
     {
         handler_bet_error(player, action);
-		mjlog.error("handler_gang flag error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
-				player->uid, player->seatid, tid);
-		return -1;
+        mjlog.error("handler_gang flag error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
+                    player->uid, player->seatid, tid);
+        return -1;
     }
 
     int i = 0;
@@ -3306,7 +3328,8 @@ int Table::handler_gang(Player* player)
     wait_handler_seat = player->seatid;
 
     Jpacket packet;
-	packet.val["cmd"] = SERVER_BET_SUCC_BC;
+    Jpacket packet1;
+    packet.val["cmd"] = SERVER_BET_SUCC_BC;
     // 只有是杠别的玩家的牌的时候才需要下面的处理
     if (gang_flag == 0)
     {
@@ -3315,20 +3338,21 @@ int Table::handler_gang(Player* player)
 
         if (seat.peng_record.find(chu_seat) == seat.peng_record.end())
         {
-            seat.peng_record[chu_seat] = 1;      
+            seat.peng_record[chu_seat] = 1;
         }
         else
         {
             seat.peng_record[chu_seat] += 1;
         }
 
-        if ( seats[chu_seat].has_chong_feng_ji ==1 && seats[chu_seat].has_ze_ren_ji == 2 )
+        if (seats[chu_seat].has_chong_feng_ji == 1 && seats[chu_seat].has_ze_ren_ji == 2)
         {
             seats[chu_seat].has_ze_ren_ji = 1;
-            has_ze_ren_ji = 1; 
+            has_ze_ren_ji = 1;
             seats[chu_seat].has_chong_feng_ji = 0;
-            has_chong_feng_ji = 0; 
+            has_chong_feng_ji = 0;
             packet.val["ze_ren_ji"] = 1;
+            packet1.val["ze_ren_ji"] = 1;
         }
         if (wu_gu_ji == 1)
         {
@@ -3339,6 +3363,7 @@ int Table::handler_gang(Player* player)
                 seats[chu_seat].has_chong_feng_wu_gu_ji = 0;
                 has_chong_feng_wu_gu_ji = 0;
                 packet.val["wu_gu_ze_ren_ji"] = 1;
+                packet1.val["wu_gu_ze_ren_ji"] = 1;
             }
         }
     }
@@ -3398,9 +3423,9 @@ int Table::handler_gang(Player* player)
         gang_hu_seat = -1;
     }
 
-	packet.val["seatid"] = player->seatid;
-	packet.val["uid"] = player->uid;
-	packet.val["action"] = action;
+    packet.val["seatid"] = player->seatid;
+    packet.val["uid"] = player->uid;
+    packet.val["action"] = action;
     packet.val["card"] = card;
     packet.val["gang_flag"] = gang_flag;
     vector_to_json_array(seat.hole_cards.cards, packet, "holes");
@@ -3417,14 +3442,13 @@ int Table::handler_gang(Player* player)
         packet.val["chu_seat"] = -1;
     }
     //vector_to_json_array(seat.hole_cards.obsorb_cards, packet, "obsorb_holes");
-	packet.end();
-	unicast(player, packet.tostring());
+    packet.end();
+    unicast(player, packet.tostring());
 
-    Jpacket packet1;
-	packet1.val["cmd"] = SERVER_BET_SUCC_BC;
-	packet1.val["seatid"] = player->seatid;
-	packet1.val["uid"] = player->uid;
-	packet1.val["action"] = action;
+    packet1.val["cmd"] = SERVER_BET_SUCC_BC;
+    packet1.val["seatid"] = player->seatid;
+    packet1.val["uid"] = player->uid;
+    packet1.val["action"] = action;
     packet1.val["card"] = card;
     packet1.val["gang_flag"] = gang_flag;
     if (gang_flag == 0)
@@ -3445,8 +3469,8 @@ int Table::handler_gang(Player* player)
     {
         packet1.val["holes"].append(0);
     }
-	packet1.end();
-	broadcast(player, packet1.tostring());
+    packet1.end();
+    broadcast(player, packet1.tostring());
 
     seat.gang_count[gang_flag]++;
     gang_count++;
@@ -3457,18 +3481,18 @@ int Table::handler_gang(Player* player)
 
         //if (seat.peng_record[chu_seat] == 1)
         //{
-            //broadcast_forbid_hu(seats[chu_seat].player, 1);
+        //broadcast_forbid_hu(seats[chu_seat].player, 1);
         //}
         //else if (seat.peng_record[chu_seat] == 2)
         //{
-            //broadcast_forbid_hu(seats[chu_seat].player, 2);
+        //broadcast_forbid_hu(seats[chu_seat].player, 2);
         //}
         //else if (seat.peng_record[chu_seat] == 3)
         //{
-            //seats[chu_seat].forbid_hu = 1;
-            //seats[chu_seat].forbided_seatid = player->seatid;
-            //forbid_hu_record[seat.seatid] = chu_seat;
-            //broadcast_forbid_hu(seats[chu_seat].player, 3);
+        //seats[chu_seat].forbid_hu = 1;
+        //seats[chu_seat].forbided_seatid = player->seatid;
+        //forbid_hu_record[seat.seatid] = chu_seat;
+        //broadcast_forbid_hu(seats[chu_seat].player, 3);
         //}
     }
     else if (gang_flag == 1)
@@ -3477,44 +3501,43 @@ int Table::handler_gang(Player* player)
         //if (fang_gang_seat >= 0)
         //{
         //  seats[fang_gang_seat].fang_gang_count++;
-        //}        
+        //}
     }
 
     return 0;
 }
 
-int Table::handler_hu(Player* player)
+int Table::handler_hu(Player *player)
 {
     Json::Value &val = player->client->packet.tojson();
     Seat &seat = seats[player->seatid];
-	int action = val["action"].asInt();
+    int action = val["action"].asInt();
     int card = val["card"].asInt();
     int hu_flag = 0;
 
-	if (seat.betting == 0)
-	{
-		handler_bet_error(player, action);
-		mjlog.error("handler_hu error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
-				player->uid, player->seatid, tid);
-		return -1;
-	}
+    if (seat.betting == 0)
+    {
+        handler_bet_error(player, action);
+        mjlog.error("handler_hu error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
+                    player->uid, player->seatid, tid);
+        return -1;
+    }
 
     if (cur_seat != player->seatid)
     {
         handler_bet_error(player, action);
-		mjlog.error("handler_hu seatid error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
-				player->uid, player->seatid, tid);
-		return -1;
+        mjlog.error("handler_hu seatid error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
+                    player->uid, player->seatid, tid);
+        return -1;
     }
 
     if (actions[NOTICE_HU] != 1)
     {
         handler_bet_error(player, action);
-		mjlog.error("handler_hu state error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
-				player->uid, player->seatid, tid);
-		return -1;
+        mjlog.error("handler_hu state error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
+                    player->uid, player->seatid, tid);
+        return -1;
     }
-
 
     if (seat.hole_cards.cards.size() % 3 == 1)
     {
@@ -3522,7 +3545,7 @@ int Table::handler_hu(Player* player)
         {
             handler_bet_error(player, action);
             mjlog.error("handler_hu error. betting[1] uid[%d] seatid[%d] tid[%d].\n",
-                      player->uid, player->seatid, tid);
+                        player->uid, player->seatid, tid);
             return -1;
         }
     }
@@ -3538,15 +3561,15 @@ int Table::handler_hu(Player* player)
     else if (seat.hole_cards.permit_hu())
     {
         win_seatid = player->seatid;
-        hu_flag = 1;      
+        hu_flag = 1;
     }
-  
+
     if (win_seatid < 0)
     {
         handler_bet_error(player, action);
-		mjlog.error("handler_hu error. betting[2] uid[%d] seatid[%d] tid[%d].\n",
-				player->uid, player->seatid, tid);
-		return -1;
+        mjlog.error("handler_hu error. betting[2] uid[%d] seatid[%d] tid[%d].\n",
+                    player->uid, player->seatid, tid);
+        return -1;
     }
 
     last_action = PLAYER_HU;
@@ -3591,50 +3614,50 @@ int Table::handler_hu(Player* player)
     }
 
     Jpacket packet;
-	packet.val["cmd"] = SERVER_BET_SUCC_BC;
-	packet.val["seatid"] = player->seatid;
-	packet.val["uid"] = player->uid;
-	packet.val["action"] = action;
+    packet.val["cmd"] = SERVER_BET_SUCC_BC;
+    packet.val["seatid"] = player->seatid;
+    packet.val["uid"] = player->uid;
+    packet.val["action"] = action;
     packet.val["card"] = card;
     packet.val["hu_flag"] = hu_flag;
     vector_to_json_array(cards, packet, "holes");
-	packet.end();
-	unicast(player, packet.tostring());
+    packet.end();
+    unicast(player, packet.tostring());
 
     Jpacket packet1;
-	packet1.val["cmd"] = SERVER_BET_SUCC_BC;
-	packet1.val["seatid"] = player->seatid;
-	packet1.val["uid"] = player->uid;
-	packet1.val["action"] = action;
+    packet1.val["cmd"] = SERVER_BET_SUCC_BC;
+    packet1.val["seatid"] = player->seatid;
+    packet1.val["uid"] = player->uid;
+    packet1.val["action"] = action;
     packet1.val["card"] = card;
     packet1.val["hu_flag"] = hu_flag;
     vector_to_json_array(cards, packet1, "holes");
-	packet1.end();
-	broadcast(player, packet1.tostring());
+    packet1.end();
+    broadcast(player, packet1.tostring());
 
     return 0;
 }
 
-int Table::handler_guo(Player* player)
+int Table::handler_guo(Player *player)
 {
     Json::Value &val = player->client->packet.tojson();
     Seat &seat = seats[player->seatid];
-	int action = val["action"].asInt();
+    int action = val["action"].asInt();
 
-	if (seat.betting == 0)
-	{
-		handler_bet_error(player, action);
-		mjlog.error("handler_guo error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
-				player->uid, player->seatid, tid);
-		return -1;
-	}
+    if (seat.betting == 0)
+    {
+        handler_bet_error(player, action);
+        mjlog.error("handler_guo error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
+                    player->uid, player->seatid, tid);
+        return -1;
+    }
 
     if (cur_seat != player->seatid)
     {
         handler_bet_error(player, action);
-		mjlog.error("handler_guo seat error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
-				player->uid, player->seatid, tid);
-		return -1;
+        mjlog.error("handler_guo seat error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
+                    player->uid, player->seatid, tid);
+        return -1;
     }
 
     // 过胡不胡
@@ -3654,11 +3677,11 @@ int Table::handler_guo(Player* player)
     handler_recored_guo(0, seat.seatid, chu_seat);
 
     Jpacket packet;
-	packet.val["cmd"] = SERVER_BET_SUCC_UC;
-	packet.val["seatid"] = player->seatid;
-	packet.val["uid"] = player->uid;
-	packet.val["action"] = action;	
-	packet.end();
+    packet.val["cmd"] = SERVER_BET_SUCC_UC;
+    packet.val["seatid"] = player->seatid;
+    packet.val["uid"] = player->uid;
+    packet.val["action"] = action;
+    packet.end();
     unicast(player, packet.tostring());
 
     if (seat.pao_hu_flag == 1)
@@ -3677,41 +3700,40 @@ int Table::handler_guo(Player* player)
 
     if (seat.hole_cards.size() % 3 == 2)
     {
-        
     }
     else
     {
-        count_next_bet();    
+        count_next_bet();
     }
-   
+
     return 0;
 }
 
-int Table::handler_ting(Player* player)
+int Table::handler_ting(Player *player)
 {
     Json::Value &val = player->client->packet.tojson();
     Seat &seat = seats[player->seatid];
-	int action = val["action"].asInt();
+    int action = val["action"].asInt();
     int card = val["card"].asInt();
 
-	if (seat.betting == 0)
-	{
-		handler_bet_error(player, action);
-		mjlog.error("handler_ting error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
-				player->uid, player->seatid, tid);
-		return -1;
-	}
+    if (seat.betting == 0)
+    {
+        handler_bet_error(player, action);
+        mjlog.error("handler_ting error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
+                    player->uid, player->seatid, tid);
+        return -1;
+    }
 
     int ret = seat.hole_cards.handler_ting(card);
     if (ret < 0)
     {
         handler_bet_error(player, action);
-		mjlog.error("handler_ting error. card[%d] uid[%d] seatid[%d] tid[%d].\n",
-                  card, player->uid, player->seatid, tid);
-		return -1;
+        mjlog.error("handler_ting error. card[%d] uid[%d] seatid[%d] tid[%d].\n",
+                    card, player->uid, player->seatid, tid);
+        return -1;
     }
 
-    if ( seat.last_actions[0] == -1 )
+    if (seat.last_actions[0] == -1)
     {
         seat.is_bao_ting = 1;
     }
@@ -3720,22 +3742,22 @@ int Table::handler_ting(Player* player)
     seat.ting = 1;
 
     Jpacket packet;
-	packet.val["cmd"] = SERVER_BET_SUCC_BC;
-	packet.val["seatid"] = player->seatid;
-	packet.val["uid"] = player->uid;
-	packet.val["action"] = action;
+    packet.val["cmd"] = SERVER_BET_SUCC_BC;
+    packet.val["seatid"] = player->seatid;
+    packet.val["uid"] = player->uid;
+    packet.val["action"] = action;
     packet.val["card"] = card;
     vector_to_json_array(seat.hole_cards.cards, packet, "holes");
-	packet.end();
+    packet.end();
     unicast(player, packet.tostring());
-  
+
     Jpacket packet1;
-	packet1.val["cmd"] = SERVER_BET_SUCC_BC;
-	packet1.val["seatid"] = player->seatid;
-	packet1.val["uid"] = player->uid;
-	packet1.val["action"] = action;
+    packet1.val["cmd"] = SERVER_BET_SUCC_BC;
+    packet1.val["seatid"] = player->seatid;
+    packet1.val["uid"] = player->uid;
+    packet1.val["action"] = action;
     packet1.val["card"] = card;
-	packet1.end();
+    packet1.end();
     broadcast(player, packet1.tostring());
 
     return 0;
@@ -3745,25 +3767,25 @@ int Table::handler_cancel(Player *player)
 {
     Json::Value &val = player->client->packet.tojson();
     Seat &seat = seats[player->seatid];
-	int action = val["action"].asInt();
+    int action = val["action"].asInt();
 
-	if (seat.betting == 0)
-	{
-		handler_bet_error(player, action);
-		mjlog.error("handler_cancel error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
-				player->uid, player->seatid, tid);
-		return -1;
-	}
+    if (seat.betting == 0)
+    {
+        handler_bet_error(player, action);
+        mjlog.error("handler_cancel error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
+                    player->uid, player->seatid, tid);
+        return -1;
+    }
 
     last_action = PLAYER_CANCEL;
     seat.ting = 0;
 
     Jpacket packet;
-	packet.val["cmd"] = SERVER_BET_SUCC_BC;
-	packet.val["seatid"] = player->seatid;
-	packet.val["uid"] = player->uid;
-	packet.val["action"] = action;	
-	packet.end();
+    packet.val["cmd"] = SERVER_BET_SUCC_BC;
+    packet.val["seatid"] = player->seatid;
+    packet.val["uid"] = player->uid;
+    packet.val["action"] = action;
+    packet.end();
     unicast(player, packet.tostring());
 
     return 0;
@@ -3773,22 +3795,22 @@ int Table::handler_jiabei(Player *player)
 {
     Json::Value &val = player->client->packet.tojson();
     Seat &seat = seats[player->seatid];
-	int action = val["action"].asInt();
+    int action = val["action"].asInt();
 
     if (actions[NOTICE_JIABEI] != 1)
     {
         handler_bet_error(player, action);
-		mjlog.error("handler_jiabei error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
-				player->uid, player->seatid, tid);
-		return -1;
+        mjlog.error("handler_jiabei error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
+                    player->uid, player->seatid, tid);
+        return -1;
     }
 
     if (seat.jiabei >= MAX_JIABEI)
     {
         handler_bet_error(player, action);
-		mjlog.error("handler_jiabei limit error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
-				player->uid, player->seatid, tid);
-		return -1;
+        mjlog.error("handler_jiabei limit error. betting[0] uid[%d] seatid[%d] tid[%d].\n",
+                    player->uid, player->seatid, tid);
+        return -1;
     }
 
     seat.hu = 0;
@@ -3797,11 +3819,11 @@ int Table::handler_jiabei(Player *player)
     last_action = PLAYER_JIABEI;
 
     Jpacket packet;
-	packet.val["cmd"] = SERVER_BET_SUCC_BC;
-	packet.val["seatid"] = player->seatid;
-	packet.val["uid"] = player->uid;
-	packet.val["action"] = action;	
-	packet.end();
+    packet.val["cmd"] = SERVER_BET_SUCC_BC;
+    packet.val["seatid"] = player->seatid;
+    packet.val["uid"] = player->uid;
+    packet.val["action"] = action;
+    packet.end();
     unicast(player, packet.tostring());
 
     return 0;
@@ -3852,13 +3874,13 @@ int Table::handler_dismiss_table(Player *player)
                 if (players.find(origin_owner_uid) != players.end())
                 {
                     players[origin_owner_uid]->incr_rmb(create_rmb * ratio);
-                    Player* player1 = players[origin_owner_uid];
+                    Player *player1 = players[origin_owner_uid];
                     insert_flow_log((int)time(NULL), player1->uid, player1->remote_ip, 0, type, zid, ttid, type, 1, 1 * ratio, player1->rmb);
-                }        
+                }
             }
 
             clean_table();
-            reset();       
+            reset();
         }
         else
         {
@@ -3892,18 +3914,18 @@ int Table::handler_dismiss_table(Player *player)
     {
         dismiss_uid = player->uid;
         dismiss_flag = 1;
-        seats[player->seatid].dismiss = 1;     
+        seats[player->seatid].dismiss = 1;
         dismiss.insert(player->uid);
 
         ev_timer_again(zjh.loop, &dismiss_timer);
-        broadcast_dismiss_status(1);    
+        broadcast_dismiss_status(1);
     }
     else if (dismiss.find(player->uid) == dismiss.end())
     {
         seats[player->seatid].dismiss = 1;
         dismiss.insert(player->uid);
 
-        if (static_cast<int>(dismiss.size()) >= (max_ready_players - 1))   // 满足解散请求同意人数
+        if (static_cast<int>(dismiss.size()) >= (max_ready_players - 1)) // 满足解散请求同意人数
         {
             broadcast_dismiss_status(3);
             ev_timer_stop(zjh.loop, &dismiss_timer);
@@ -3917,12 +3939,12 @@ int Table::handler_dismiss_table(Player *player)
             dismiss.clear();
             reset();
         }
-        else                                                           
-        {            
+        else
+        {
             broadcast_dismiss_status(2);
-        }     
+        }
     }
-  
+
     return 0;
 }
 
@@ -3944,15 +3966,16 @@ void Table::broadcast_dismiss_status(int flag)
         packet.val["dismiss_uid"] = 0;
     }
 
-	int i = 0;
-    std::map<int, Player*>::iterator it;
-	for (it = players.begin(); it != players.end(); it++) {
-		Player *p = it->second;
-		Seat &seat = seats[p->seatid];
+    int i = 0;
+    std::map<int, Player *>::iterator it;
+    for (it = players.begin(); it != players.end(); it++)
+    {
+        Player *p = it->second;
+        Seat &seat = seats[p->seatid];
 
-		packet.val["players"][i]["uid"] = p->uid;
+        packet.val["players"][i]["uid"] = p->uid;
         packet.val["players"][i]["name"] = p->name;
-		packet.val["players"][i]["seatid"] = p->seatid;	
+        packet.val["players"][i]["seatid"] = p->seatid;
         packet.val["players"][i]["dismiss"] = seat.dismiss;
         i++;
     }
@@ -3963,29 +3986,27 @@ void Table::broadcast_dismiss_status(int flag)
 
 void Table::clean_table()
 {
-    std::map<int, Player*>::iterator it = players.begin();
-    std::map<int, Player*>::iterator nit = players.begin();
+    std::map<int, Player *>::iterator it = players.begin();
+    std::map<int, Player *>::iterator nit = players.begin();
 
     state = ROOM_WAIT_GAME;
 
-
-
-	if (round_count == 0 && substitute == 1)
-	{
-		Player::incr_rmb(owner_uid, create_rmb);
-		zjh.game->del_subs_table(owner_uid);
+    if (round_count == 0 && substitute == 1)
+    {
+        Player::incr_rmb(owner_uid, create_rmb);
+        zjh.game->del_subs_table(owner_uid);
     }
 
     if (round_count > 0)
     {
-		if (!transfer_flag && substitute != 1)
+        if (!transfer_flag && substitute != 1)
         {
-			/*
+            /*
             players[owner_uid]->incr_rmb(0 - create_rmb * ratio);
             Player* player = players[owner_uid];
             insert_flow_log((int)time(NULL), player->uid, player->remote_ip, 0, type, zid, ttid, type, 0, 1 * ratio, player->rmb);
             */
-			create_table_cost();
+            create_table_cost();
         }
 
         for (int i = 0; i < seat_max; i++)
@@ -3993,14 +4014,14 @@ void Table::clean_table()
             if (seats[i].player != NULL)
             {
                 if (seats[i].player->uid == owner_uid)
-                {                   
+                {
                     seats[i].player->incr_total_create(1);
                 }
                 seats[i].player->incr_total_play(1);
             }
         }
     }
-    
+
     for (int i = 0; i < seat_max; i++)
     {
         seats[i].dismiss = 0;
@@ -4037,14 +4058,14 @@ void Table::clean_table()
         modify_substitute_info(2);
     }
 
-	zjh.temp_rc->command("LPUSH tids_list %d",ttid);
+    zjh.temp_rc->command("LPUSH tids_list %d", ttid);
     zjh.game->table_ttid.erase(ttid);
     zjh.game->set_table_flag(ttid, 0);
     zjh.game->table_owners.erase(owner_uid);
 
     ttid = -1;
     owner_uid = -1;
-	owner_sex = -1;
+    owner_sex = -1;
     owner_name = "";
     owner_remote_ip = "";
     origin_owner_uid = -1;
@@ -4055,27 +4076,27 @@ void Table::clean_table()
     ahead_start_flag = 0;
     ahead_start_uid = -1;
     game_end_flag = 0;
-	dismiss.clear();
-	redpackes.clear();
+    dismiss.clear();
+    redpackes.clear();
 
     for (int i = 0; i < seat_max; i++)
-	{
-		seats[i].clear();
-	}
+    {
+        seats[i].clear();
+    }
 
     reset();
 
     ev_timer_stop(zjh.loop, &preready_timer);
     ev_timer_stop(zjh.loop, &ready_timer);
     ev_timer_stop(zjh.loop, &dismiss_timer);
-	ev_timer_stop(zjh.loop, &subs_timer);
+    ev_timer_stop(zjh.loop, &subs_timer);
     ev_timer_stop(zjh.loop, &ahead_start_timer);
     //ev_timer_stop(zjh.loop, &single_ready_timer);
 }
 
 void Table::dismiss_timer_cb(struct ev_loop *loop, struct ev_timer *w, int revents)
 {
-    Table *table = (Table*) w->data;
+    Table *table = (Table *)w->data;
     ev_timer_stop(zjh.loop, &table->dismiss_timer);
 
     table->dismiss_timeout();
@@ -4098,7 +4119,9 @@ int Table::dismiss_timeout()
 
 void Table::vector_to_json_string(std::vector<Card> &cards, Jpacket &packet, string key)
 {
-    char buff[256] = {0, };
+    char buff[256] = {
+        0,
+    };
     int len = 0;
 
     if (cards.size() > 0)
@@ -4106,7 +4129,7 @@ void Table::vector_to_json_string(std::vector<Card> &cards, Jpacket &packet, str
         for (unsigned int i = 0; i < cards.size() - 1; i++)
         {
             len = strlen(buff);
-            snprintf(buff + len, sizeof(buff) - len, "%d_", cards[i].value); 
+            snprintf(buff + len, sizeof(buff) - len, "%d_", cards[i].value);
         }
 
         len = strlen(buff);
@@ -4114,16 +4137,22 @@ void Table::vector_to_json_string(std::vector<Card> &cards, Jpacket &packet, str
         len = strlen(buff);
         buff[len] = '\0';
     }
-   
+
     packet.val[key] = buff;
 }
 
 int Table::insert_flow_record()
 {
     Jpacket packet;
-    char rid[32] = {0, };
-    char replay_key[32] = {0, };
-    char replayid[64] = {0, };
+    char rid[32] = {
+        0,
+    };
+    char replay_key[32] = {
+        0,
+    };
+    char replayid[64] = {
+        0,
+    };
 
     snprintf(rid, 32, "%d_%d", round_ts, ttid);
     snprintf(replay_key, 32, "%d_%d", ts, ttid);
@@ -4141,7 +4170,7 @@ int Table::insert_flow_record()
     packet.val["owner_name"] = owner_name;
     packet.val["substitute"] = substitute;
 
-    const char* prefix = zjh.conf["replay_prefix"].asCString();
+    const char *prefix = zjh.conf["replay_prefix"].asCString();
     snprintf(replayid, sizeof(replayid), "%s/%d_%d", prefix, ts, ttid);
     packet.val["replay_url"] = replayid;
     snprintf(replayid, sizeof(replayid), "%d%d", ttid, ts % 300000);
@@ -4155,7 +4184,7 @@ int Table::insert_flow_record()
     // {
     //     vector_to_json_array(*it, packet, "docards");
     // }
-    
+
     int index = 1;
     for (int i = 0; i < seat_max; i++)
     {
@@ -4165,14 +4194,14 @@ int Table::insert_flow_record()
             continue;
         }
 
-        Player* player = seats[i].player;
+        Player *player = seats[i].player;
 
         switch (index)
         {
         case 1:
             packet.val["x1id"] = player->uid;
             packet.val["x1name"] = player->name;
-            packet.val["x1bet"] = seats[i].bet; 
+            packet.val["x1bet"] = seats[i].bet;
             //packet.val["x1ratio"] = seats[i].bet_ratio;
             packet.val["x1ip"] = player->remote_ip;
             vector_to_json_string(seats[i].hole_cards.cards, packet, "x1cards");
@@ -4206,13 +4235,13 @@ int Table::insert_flow_record()
     }
 
     string str = packet.val.toStyledString().c_str();
-    
+
     int ret = zjh.temp_rc->command("LPUSH flow_list %s", str.c_str());
 
     if (ret < 0)
     {
         mjlog.error("insert_flow_record %s", str.c_str());
-        return - 1;
+        return -1;
     }
 
     return 0;
@@ -4221,7 +4250,9 @@ int Table::insert_flow_record()
 int Table::insert_flow_round_record()
 {
     Jpacket packet;
-    char rid[32] = {0, };
+    char rid[32] = {
+        0,
+    };
 
     int init_money = zjh.conf["tables"]["init_money"].asInt();
 
@@ -4242,7 +4273,7 @@ int Table::insert_flow_round_record()
             continue;
         }
 
-        Player* player = seats[i].player;
+        Player *player = seats[i].player;
 
         switch (index)
         {
@@ -4275,7 +4306,7 @@ int Table::insert_flow_round_record()
         index++;
     }
 
-	int owner_flag = 0;
+    int owner_flag = 0;
     for (int i = 0; i < seat_max; i++)
     {
         if (seats[i].occupied == 0)
@@ -4284,61 +4315,61 @@ int Table::insert_flow_round_record()
             continue;
         }
 
-        Player* player = seats[i].player;
+        Player *player = seats[i].player;
         packet.val["uid"] = player->uid;
         packet.val["uname"] = player->name;
         packet.val["uip"] = player->remote_ip;
 
-		if (player->uid == owner_uid)
-		{
-			owner_flag = 1;
-		}
+        if (player->uid == owner_uid)
+        {
+            owner_flag = 1;
+        }
 
-		string str = packet.val.toStyledString().c_str();
-		int ret = zjh.temp_rc->command("LPUSH flow_round_list %s", str.c_str());
+        string str = packet.val.toStyledString().c_str();
+        int ret = zjh.temp_rc->command("LPUSH flow_round_list %s", str.c_str());
 
         if (ret < 0)
         {
-             mjlog.error("insert_flow_round_record %s", str.c_str());
+            mjlog.error("insert_flow_round_record %s", str.c_str());
         }
     }
-    
-	if(owner_flag == 0 && substitute == 1)
-	{	
-		packet.val["uid"] = owner_uid;
-		packet.val["uname"] = owner_name;
-		packet.val["uip"] = owner_remote_ip;
-		string str = packet.val.toStyledString().c_str();
-		int ret = zjh.temp_rc->command("LPUSH flow_round_list %s", str.c_str());
 
-		if (ret < 0)
-		{
-			mjlog.error("insert_flow_round_record %s", str.c_str());
-		}
-	}
+    if (owner_flag == 0 && substitute == 1)
+    {
+        packet.val["uid"] = owner_uid;
+        packet.val["uname"] = owner_name;
+        packet.val["uip"] = owner_remote_ip;
+        string str = packet.val.toStyledString().c_str();
+        int ret = zjh.temp_rc->command("LPUSH flow_round_list %s", str.c_str());
+
+        if (ret < 0)
+        {
+            mjlog.error("insert_flow_round_record %s", str.c_str());
+        }
+    }
     return 0;
 }
 
-void Table::handler_net_status(Player* player, int status)
+void Table::handler_net_status(Player *player, int status)
 {
     Jpacket packet;
-	packet.val["cmd"] = SERVER_NET_STATUS_BC;
-	packet.val["uid"] = player->uid;
-	packet.val["seatid"] = player->seatid;
+    packet.val["cmd"] = SERVER_NET_STATUS_BC;
+    packet.val["uid"] = player->uid;
+    packet.val["seatid"] = player->seatid;
     packet.val["name"] = player->name;
-	packet.val["money"] = player->money;
-	packet.val["rmb"] = player->rmb;
-	packet.val["total_board"] = player->total_board;
+    packet.val["money"] = player->money;
+    packet.val["rmb"] = player->rmb;
+    packet.val["total_board"] = player->total_board;
     packet.val["status"] = status;
 
-	packet.end();
-	broadcast(player, packet.tostring());
+    packet.end();
+    broadcast(player, packet.tostring());
 }
 
 int Table::calculate_base_score(int sid, int pao, int card_value)
 {
     Seat &seat = seats[sid];
-    if ( card_value >= 0) 
+    if (card_value >= 0)
     {
         seat.hole_cards.analysis_card_type(card_value);
     }
@@ -4354,7 +4385,7 @@ int Table::calculate_base_score(int sid, int pao, int card_value)
     {
         seat.hole_cards.analysis_card_type();
     }
-    
+
     seat.card_type = seat.hole_cards.card_type;
 
     int score = 0;
@@ -4369,27 +4400,27 @@ int Table::calculate_base_score(int sid, int pao, int card_value)
         score = 5;
         seat.hu_pai_lei_xing = "碰碰胡";
         break;
-	case CARD_TYPE_QI_XIAO_DUI:// 7小对
+    case CARD_TYPE_QI_XIAO_DUI: // 7小对
         score = 5;
         seat.hu_pai_lei_xing = "七小对";
         break;
-    case CARD_TYPE_LONG_QI_DUI:         //龙七对
+    case CARD_TYPE_LONG_QI_DUI: //龙七对
         score = 20;
         seat.hu_pai_lei_xing = "龙七对";
         break;
-    case CARD_TYPE_QING_YI_SE:     // 清一色
+    case CARD_TYPE_QING_YI_SE: // 清一色
         score = 10;
         seat.hu_pai_lei_xing = "清一色";
         break;
-	case CARD_TYPE_QING_PENG:	// 清一色碰碰胡
+    case CARD_TYPE_QING_PENG: // 清一色碰碰胡
         score = 15;
         seat.hu_pai_lei_xing = "清一色碰碰胡";
         break;
-    case CARD_TYPE_QING_QI_DUI:// 清一色七小对
+    case CARD_TYPE_QING_QI_DUI: // 清一色七小对
         score = 20;
         seat.hu_pai_lei_xing = "清一色七小对";
         break;
-    case CARD_TYPE_QING_LONG_QI_DUI:// 清龙七对
+    case CARD_TYPE_QING_LONG_QI_DUI: // 清龙七对
         score = 30;
         seat.hu_pai_lei_xing = "青龙七对";
         break;
@@ -4420,8 +4451,6 @@ int Table::calculate_base_score(int sid, int pao, int card_value)
             //score *= 2;
         }
     }
-
-
 
     if (seat.last_actions[0] == PLAYER_HU && seat.last_actions[1] == PLAYER_GANG)
     {
@@ -4458,17 +4487,17 @@ int Table::calculate_base_score(int sid, int pao, int card_value)
         //score *= 2;
     }
 
-    if (seats[sid].is_bao_ting == 1 && is_huang_zhuang == 0 )  //报听
+    if (seats[sid].is_bao_ting == 1 && is_huang_zhuang == 0) //报听
     {
-       score *= 10;  //底分为10
+        score *= 10; //底分为10
     }
 
-    if ( pao_hu_seat > 0 && seats[chu_seat].is_bao_ting == 1) //杀报
+    if (pao_hu_seat > 0 && seats[chu_seat].is_bao_ting == 1) //杀报
     {
         score *= 10;
     }
 
-    if ( is_qiang_gang )
+    if (is_qiang_gang)
     {
         score += 1; //抢扛多收取一分
     }
@@ -4535,7 +4564,7 @@ int Table::calculate_base_score(int sid, int pao, int card_value)
                     break;
                 }
             }
-            
+
             for (int i = 0; i < fan_count - 1; i++)
             {
                 //score *= 2;
@@ -4548,9 +4577,7 @@ int Table::calculate_base_score(int sid, int pao, int card_value)
         }
     }
 
-    if (pao == 1
-        && seats[pao_hu_seat].hole_cards.an_gang_count == 0
-        && seats[pao_hu_seat].hole_cards.cards.size() == 1)
+    if (pao == 1 && seats[pao_hu_seat].hole_cards.an_gang_count == 0 && seats[pao_hu_seat].hole_cards.cards.size() == 1)
     {
         quan_qiu_ren_pao = 1;
         if (score < 9 && !seat.hole_cards.men_qing_flag)
@@ -4573,9 +4600,9 @@ int Table::calculate_base_score(int sid, int pao, int card_value)
     }
 
     mjlog.debug("gang_shang_hua %d, gang_shang_pao %d, quan_qiu_ren_pao %d, gang_shang_hua_seat %d\n",
-              gang_shang_hua_flag, gang_shang_pao, quan_qiu_ren_pao, gang_shang_hua_seat);
+                gang_shang_hua_flag, gang_shang_pao, quan_qiu_ren_pao, gang_shang_hua_seat);
 
-    return score ;
+    return score;
 }
 
 void Table::update_account_bet()
@@ -4619,7 +4646,7 @@ void Table::update_account_bet()
             //如果热炮玩家，明杠了其它玩家的牌，其它玩家不扣分
             std::map<int, std::map<int, int> >::iterator ite = seats[chu_seat].score_from_players_detail.begin();
             std::map<int, std::map<int, int> >::iterator iend = seats[chu_seat].score_from_players_detail.begin();
-            for(; ite != iend; ite++)
+            for (; ite != iend; ite++)
             {
                 int first_value = ite->first; //出分的玩家
                 std::map<int, int> second_value = ite->second;
@@ -4637,15 +4664,14 @@ void Table::update_account_bet()
             continue;
         }
 
-
         if (seats[i].gang_count[0] > 0)
         {
             seats[i].bet += 3 * seats[i].gang_count[0];
         }
-        
+
         if (seats[i].gang_count[1] > 0)
         {
-            seats[i].bet += (max_ready_players - 1) * 1 * seats[i].gang_count[1];       
+            seats[i].bet += (max_ready_players - 1) * 1 * seats[i].gang_count[1];
             for (int j = 1; j < seat_max; j++)
             {
                 int index = (i + j) % seat_max;
@@ -4679,7 +4705,7 @@ void Table::update_account_bet()
         if (seats[i].gang_count[3] > 0)
         {
             seats[i].bet += (max_ready_players - 1) * 2 * seats[i].gang_count[3];
-            
+
             for (int j = 1; j < seat_max; j++)
             {
                 int index = (i + j) % seat_max;
@@ -4696,14 +4722,14 @@ void Table::update_account_bet()
 
     for (int i = 0; i < seat_max; i++)
     {
-        Player* player = seats[i].player;
+        Player *player = seats[i].player;
         if (player == NULL)
         {
             continue;
         }
         mjlog.debug("update acount gang, uid[%d], money[%d], bet[%d] gang_count0[%d] gang_count1[%d] gang_count2[%d] gang_count3[%d]\n", player->uid, player->money, seats[i].bet,
-                seats[i].gang_count[0], seats[i].gang_count[1], seats[i].gang_count[2], seats[i].gang_count[3]);
-    }    
+                    seats[i].gang_count[0], seats[i].gang_count[1], seats[i].gang_count[2], seats[i].gang_count[3]);
+    }
 
     if (win_seatid < 0 && pao_hu_seat < 2 && gang_hu_seat < 2)
     {
@@ -4724,14 +4750,14 @@ void Table::update_account_bet()
 
     if (pao_hu_seat >= 0) // 放炮胡
     {
-         // 放炮算法
+        // 放炮算法
         for (int i = 0; i < seat_max; i++)
         {
             if (seats[i].ready != 1)
             {
                 continue;
             }
-            
+
             if (i == win_seatid || seats[i].pao_hu_flag == 1)
             {
                 int score = calculate_base_score(i, 1);
@@ -4751,13 +4777,12 @@ void Table::update_account_bet()
 
                     seats[pao_hu_seat].bet -= score * (seats[i].lian_zhuang_cnt - 1);
                 }
-
             }
             else
             {
-                if(seats[i].hole_cards.ting_cards.size() == 0)
+                if (seats[i].hole_cards.ting_cards.size() == 0)
                     seats[i].hu_pai_lei_xing = "未叫牌";
-                else 
+                else
                     seats[i].hu_pai_lei_xing = "叫牌";
             }
         }
@@ -4786,15 +4811,15 @@ void Table::update_account_bet()
                     seats[i].bet += score * (max_ready_players - 1) * (seats[i].lian_zhuang_cnt - 1);
                     seats[i].score_from_players_detail[gang_hu_seat][LIAN_ZHUANG_TYPE] = score * (seats[i].lian_zhuang_cnt - 1);
                     score_from_players_item_count[i][LIAN_ZHUANG_TYPE] = seats[i].lian_zhuang_cnt - 1;
-                    score_to_players_item_count[gang_hu_seat][LIAN_ZHUANG_TYPE] = seats[i].lian_zhuang_cnt -  1;
+                    score_to_players_item_count[gang_hu_seat][LIAN_ZHUANG_TYPE] = seats[i].lian_zhuang_cnt - 1;
                     seats[gang_hu_seat].bet -= score * (max_ready_players - 1) * (seats[i].lian_zhuang_cnt - 1);
                 }
             }
             else
             {
-                if(seats[i].hole_cards.ting_cards.size() == 0)
+                if (seats[i].hole_cards.ting_cards.size() == 0)
                     seats[i].hu_pai_lei_xing = "未叫牌";
-                else 
+                else
                     seats[i].hu_pai_lei_xing = "叫牌";
             }
         }
@@ -4812,7 +4837,7 @@ void Table::update_account_bet()
             }
 
             if (i == win_seatid)
-            {               
+            {
                 seats[i].bet += (max_ready_players - 1) * score;
                 score_from_players_item_count[i][ZI_MO_TYPE]++;
                 if (gang_shang_hua_seat >= 0)
@@ -4825,16 +4850,16 @@ void Table::update_account_bet()
                     seats[i].bet += score * (max_ready_players - 1) * (seats[i].lian_zhuang_cnt - 1);
                     score_from_players_item_count[i][LIAN_ZHUANG_TYPE] = seats[i].lian_zhuang_cnt - 1;
                     if (gang_shang_hua_seat >= 0)
-                        seats[i].score_from_players_detail[gang_shang_hua_seat][LIAN_ZHUANG_TYPE] = score *(max_ready_players - 1) * (seats[i].lian_zhuang_cnt - 1);
+                        seats[i].score_from_players_detail[gang_shang_hua_seat][LIAN_ZHUANG_TYPE] = score * (max_ready_players - 1) * (seats[i].lian_zhuang_cnt - 1);
                     else
-                        seats[i].score_from_players_detail[-1][LIAN_ZHUANG_TYPE] = score *(max_ready_players - 1) * (seats[i].lian_zhuang_cnt - 1);
+                        seats[i].score_from_players_detail[-1][LIAN_ZHUANG_TYPE] = score * (max_ready_players - 1) * (seats[i].lian_zhuang_cnt - 1);
                 }
             }
             else
             {
-                if(seats[i].hole_cards.ting_cards.size() == 0)
+                if (seats[i].hole_cards.ting_cards.size() == 0)
                     seats[i].hu_pai_lei_xing = "未叫牌";
-                else 
+                else
                     seats[i].hu_pai_lei_xing = "叫牌";
                 if (gang_shang_hua_seat >= 0)
                 {
@@ -4843,7 +4868,7 @@ void Table::update_account_bet()
 
                     if (seats[win_seatid].lian_zhuang_cnt > 1) //连庄分
                     {
-                        seats[gang_shang_hua_seat].bet -= score* (seats[win_seatid].lian_zhuang_cnt - 1);
+                        seats[gang_shang_hua_seat].bet -= score * (seats[win_seatid].lian_zhuang_cnt - 1);
                         score_to_players_item_count[gang_shang_hua_seat][LIAN_ZHUANG_TYPE]++;
                     }
                 }
@@ -4857,21 +4882,21 @@ void Table::update_account_bet()
                         seats[i].bet -= score * (seats[win_seatid].lian_zhuang_cnt - 1);
                         score_to_players_item_count[i][LIAN_ZHUANG_TYPE]++;
                     }
-                }                  
+                }
             }
         }
     }
 
     for (int i = 0; i < seat_max; i++)
     {
-        Player* player = seats[i].player;
+        Player *player = seats[i].player;
         if (player == NULL)
         {
             continue;
         }
         mjlog.debug("update acount base core, uid[%d], money[%d], bet[%d]\n", player->uid, player->money, seats[i].bet);
-    }    
-    
+    }
+
     zhong_horse.clear();
 
     // 处理鸡牌
@@ -4879,7 +4904,6 @@ void Table::update_account_bet()
     {
         return;
     }
-
 
     //根据规则，将所有的鸡牌算出来
     //幺鸡固定为鸡牌
@@ -4893,15 +4917,15 @@ void Table::update_account_bet()
     //乌骨鸡,八筒和幺鸡一样为固定鸡；
     if (wu_gu_ji == 1)
     {
-        ji_data batong;//八筒
-        batong.value = 2*16+8;
+        ji_data batong; //八筒
+        batong.value = 2 * 16 + 8;
         batong.type = WU_GU_JI;
         ji_pai.push_back(batong);
         horse_count++;
         mjlog.debug("jipai wu_gu_ji[%d]\n", batong.value);
     }
 
-    for (unsigned int i = 0; i < deck.horse_cards.size(); i++)//鸡牌一般就翻一个鸡牌，这里写循环以后回到多个
+    for (unsigned int i = 0; i < deck.horse_cards.size(); i++) //鸡牌一般就翻一个鸡牌，这里写循环以后回到多个
     {
         //本鸡
         if (ben_ji == 1)
@@ -4913,7 +4937,7 @@ void Table::update_account_bet()
                 ji_pai[0].type = JIN_JI;
                 mjlog.debug("jipai has jin ji[yao ji]\n", ji.value);
             }
-            else if (ji.value == 2*16+8) 
+            else if (ji.value == 2 * 16 + 8)
             {
                 ji_pai[1].type = JIN_JI;
                 mjlog.debug("jipai has jin ji[wu gu ji]\n", ji.value);
@@ -4987,11 +5011,11 @@ void Table::update_account_bet()
         }
 
         for (int i = 0; i < horse_count; i++)
-        {//循环每张鸡牌
+        { //循环每张鸡牌
             //查看玩家的手牌
             for (unsigned int k = 0; k < seats[j].hole_cards.cards.size(); ++k)
             {
-                if (seats[j].hole_cards.cards[k] == ji_pai[i].value )
+                if (seats[j].hole_cards.cards[k] == ji_pai[i].value)
                 {
                     seats[j].ji_pai.push_back(ji_pai[i]);
                     seats[j].horse_count++;
@@ -5002,39 +5026,51 @@ void Table::update_account_bet()
             std::list<Card>::iterator ite = seats[j].hole_cards.discard_cards.begin();
             for (; ite != seats[j].hole_cards.discard_cards.end(); ++ite)
             {
-                if (ite->value == ji_pai[i].value )
+                if (ite->value == ji_pai[i].value)
                 {
                     seats[j].ji_pai.push_back(ji_pai[i]);
                     seats[j].horse_count++;
                 }
             }
             //查看碰和杠的牌
-            for(unsigned int k=0; k < seats[j].hole_cards.obsorb_cards.size(); ++k)
+            for (unsigned int k = 0; k < seats[j].hole_cards.obsorb_cards.size(); ++k)
             {
                 for (unsigned int h = 0; h < seats[j].hole_cards.obsorb_cards[k].size(); ++h)
                 {
-                    if (seats[j].hole_cards.obsorb_cards[k][h] == ji_pai[i].value )
+                    if (seats[j].hole_cards.obsorb_cards[k][h] == ji_pai[i].value)
                     {
                         seats[j].ji_pai.push_back(ji_pai[i]);
                         seats[j].horse_count++;
+                    }
+                    if (seats[j].hole_cards.obsorb_cards[k][h] == 0) //暗杠
+                    {
+                        for (unsigned int h2 = 0; h < seats[j].hole_cards.obsorb_cards[k].size(); ++h2)
+                        { //找到暗杠的面值是否是鸡牌
+                            if (seats[j].hole_cards.obsorb_cards[k][h2] == ji_pai[i].value)
+                            {
+                                seats[j].ji_pai.push_back(ji_pai[i]);
+                                seats[j].horse_count++;
+                                break;
+                            }
+                        }
                     }
                 }
             }
         }
     }
-    for (int i=0; i<seat_max; i++)
+    for (int i = 0; i < seat_max; i++)
     { //输出鸡的日志,调试用
         if (seats[i].occupied != 1)
             continue;
         mjlog.debug("jipai seats[%d] horse_count[%d]:\n", i, seats[i].horse_count);
-        for ( int j = 0; j < seats[i].horse_count; ++j)
+        for (int j = 0; j < seats[i].horse_count; ++j)
         {
             mjlog.debug("---ji_pai%d_value[%d]_type[%d]\n", j, seats[i].ji_pai[j].value, seats[i].ji_pai[j].type);
         }
     }
 
     for (int i = 0; i < seat_max; i++)
-    {//根据玩家手中的鸡牌，算bet值
+    { //根据玩家手中的鸡牌，算bet值
         if (seats[i].ready != 1)
         {
             continue;
@@ -5045,10 +5081,10 @@ void Table::update_account_bet()
             continue;
         }
 
-        for ( int j = 0; j<seats[i].horse_count; ++j )
-        { 
+        for (int j = 0; j < seats[i].horse_count; ++j)
+        {
 
-            if (seats[i].ji_pai[j].value == 1) 
+            if (seats[i].ji_pai[j].value == 1)
             {
                 if (seats[i].ji_pai[j].type == YAO_BAI_JI)
                 {
@@ -5057,85 +5093,121 @@ void Table::update_account_bet()
                     mjlog.debug("jipai seats[%d] you jin ji.\n", i);
                 }
             }
+            switch (seats[i].ji_pai[j].type)
+            {
+            case YAO_BAI_JI:
+                score_from_players_item_count[i][YAO_BAI_JI_TYPE]++;
+                break;
+            case BEN_JI:
+                score_from_players_item_count[i][BEN_JI_TYPE]++;
+                break;
+            case WU_GU_JI:
+                score_from_players_item_count[i][WU_GU_JI_TYPE]++;
+                break;
+            case YAO_JI:
+                score_from_players_item_count[i][YAO_JI_TYPE]++;
+                break;
+            case JIN_JI:
+                score_from_players_item_count[i][JIN_JI_TYPE]++;
+                break;
+            case BAO_JI:
+                score_from_players_item_count[i][BAO_JI]++;
+                break;
+            default:
+                break;
+            }
             for (int k = 0; k < seat_max; k++)
             {
-                if (seats[k].ready != 1 || i ==k)
+                if (seats[k].ready != 1 || i == k)
                 {
                     continue;
                 }
                 switch (seats[i].ji_pai[j].type)
                 {
-                    case YAO_BAI_JI:
-                        seats[i].bet += YAO_BAI_JI_BET;
-                        seats[k].bet -= YAO_BAI_JI_BET;
-                        seats[i].score_from_players_detail[k][YAO_BAI_JI_TYPE] += YAO_BAI_JI_BET;
-                        score_from_players_item_count[i][YAO_BAI_JI_TYPE]++;
-                        score_to_players_item_count[k][YAO_BAI_JI_TYPE]++;
-                        mjlog.debug("YAO BAI JI seatsid[%d] win %d seatsid[%d] lose\n", i, YAO_BAI_JI_BET, k);
-                        break;
-                    case BEN_JI:
-                        seats[i].bet += BEN_JI_BET;
-                        seats[k].bet -= BEN_JI_BET;
-                        seats[i].score_from_players_detail[k][BEN_JI_TYPE] += BEN_JI_BET;
-                        score_from_players_item_count[i][BEN_JI_TYPE]++;
-                        score_to_players_item_count[k][BEN_JI_TYPE]++;
-                        mjlog.debug("BEN JI seatsid[%d] win %d seatsid[%d] lose\n", i, BEN_JI_BET, k);
-                        break;
-                    case WU_GU_JI:
-                        seats[i].bet += WU_GU_JI_BET;
-                        seats[k].bet -= WU_GU_JI_BET;
-                        seats[i].score_from_players_detail[k][WU_GU_JI_TYPE] += WU_GU_JI_BET;
-                        score_from_players_item_count[i][WU_GU_JI_TYPE]++;
-                        score_to_players_item_count[k][WU_GU_JI_TYPE]++;
-                        mjlog.debug("WU_GU_JI seatsid[%d] win %d seatsid[%d] lose\n", i, WU_GU_JI_BET, k);
-                        break;
-                    case YAO_JI:
-                        seats[i].bet += YAO_JI_BET;
-                        seats[k].bet -= YAO_JI_BET;
-                        seats[i].score_from_players_detail[k][YAO_JI_TYPE] += YAO_JI_BET;
-                        score_from_players_item_count[i][YAO_JI_TYPE]++;
-                        score_to_players_item_count[k][YAO_JI_TYPE]++;
-                        mjlog.debug("YAO JI seatsid[%d] win %d seatsid[%d] lose\n", i,YAO_JI_BET, k);
-                        break;
-                    case JIN_JI:
-                        seats[i].bet += JIN_JI_BET;
-                        seats[k].bet -= JIN_JI_BET;
-                        seats[i].score_from_players_detail[k][JIN_JI_TYPE] += JIN_JI_BET;
-                        score_from_players_item_count[i][JIN_JI_TYPE]++;
-                        score_to_players_item_count[k][JIN_JI_TYPE]++;
-                        mjlog.debug("JIN JI seatsid[%d] win %d seatsid[%d] lose\n", i, JIN_JI_BET, k);
-                        break;
-                    case BAO_JI:
-                        seats[i].bet += BAO_JI_BET;
-                        seats[k].bet -= BAO_JI_BET;
-                        seats[i].score_from_players_detail[k][BAO_JI_TYPE] += BAO_JI_BET;
-                        score_from_players_item_count[i][BAO_JI]++;
-                        score_to_players_item_count[k][BAO_JI]++;
-                        mjlog.debug("BAO JI seatsid[%d] win %d seatsid[%d] lose\n", i, BAO_JI_BET, k);
-                        break;
-                    default :
-                        break;
+                case YAO_BAI_JI:
+                    // seats[i].bet += YAO_BAI_JI_BET;
+                    // seats[k].bet -= YAO_BAI_JI_BET;
+                    seats[i].score_from_players_detail[k][YAO_BAI_JI_TYPE] += YAO_BAI_JI_BET;
+                    score_to_players_item_count[k][YAO_BAI_JI_TYPE]++;
+                    mjlog.debug("YAO BAI JI seatsid[%d] win %d seatsid[%d] lose\n", i, YAO_BAI_JI_BET, k);
+                    break;
+                case BEN_JI:
+                    // seats[i].bet += BEN_JI_BET;
+                    // seats[k].bet -= BEN_JI_BET;
+                    seats[i].score_from_players_detail[k][BEN_JI_TYPE] += BEN_JI_BET;
+                    score_to_players_item_count[k][BEN_JI_TYPE]++;
+                    mjlog.debug("BEN JI seatsid[%d] win %d seatsid[%d] lose\n", i, BEN_JI_BET, k);
+                    break;
+                case WU_GU_JI:
+                    // seats[i].bet += WU_GU_JI_BET;
+                    // seats[k].bet -= WU_GU_JI_BET;
+                    seats[i].score_from_players_detail[k][WU_GU_JI_TYPE] += WU_GU_JI_BET;
+                    score_to_players_item_count[k][WU_GU_JI_TYPE]++;
+                    mjlog.debug("WU_GU_JI seatsid[%d] win %d seatsid[%d] lose\n", i, WU_GU_JI_BET, k);
+                    break;
+                case YAO_JI:
+                    // seats[i].bet += YAO_JI_BET;
+                    // seats[k].bet -= YAO_JI_BET;
+                    seats[i].score_from_players_detail[k][YAO_JI_TYPE] += YAO_JI_BET;
+                    score_to_players_item_count[k][YAO_JI_TYPE]++;
+                    mjlog.debug("YAO JI seatsid[%d] win %d seatsid[%d] lose\n", i, YAO_JI_BET, k);
+                    break;
+                case JIN_JI:
+                    // seats[i].bet += JIN_JI_BET;
+                    // seats[k].bet -= JIN_JI_BET;
+                    seats[i].score_from_players_detail[k][JIN_JI_TYPE] += JIN_JI_BET;
+                    score_to_players_item_count[k][JIN_JI_TYPE]++;
+                    mjlog.debug("JIN JI seatsid[%d] win %d seatsid[%d] lose\n", i, JIN_JI_BET, k);
+                    break;
+                case BAO_JI:
+                    // seats[i].bet += BAO_JI_BET;
+                    // seats[k].bet -= BAO_JI_BET;
+                    seats[i].score_from_players_detail[k][BAO_JI_TYPE] += BAO_JI_BET;
+                    score_to_players_item_count[k][BAO_JI]++;
+                    mjlog.debug("BAO JI seatsid[%d] win %d seatsid[%d] lose\n", i, BAO_JI_BET, k);
+                    break;
+                default:
+                    break;
                     //case CHONG_FENG_WU_GU_JI:
-                        //seats[i].bet += CHONG_FENG_WU_GU_JI_BET;
-                        //seats[k].bet -= CHONG_FENG_WU_GU_JI_BET;
-                        //seats[i].score_from_players_detail[k][CHONG_FENG_WU_GU_JI_TYPE] = seats[i].bet;
-                        //break;
+                    //seats[i].bet += CHONG_FENG_WU_GU_JI_BET;
+                    //seats[k].bet -= CHONG_FENG_WU_GU_JI_BET;
+                    //seats[i].score_from_players_detail[k][CHONG_FENG_WU_GU_JI_TYPE] = seats[i].bet;
+                    //break;
                     //case CHONG_FEN_JI:
-                        //seats[i].bet += CHONG_FEN_JI_BET;
-                        //seats[k].bet -= CHONG_FEN_JI_BET;
-                        //seats[i].score_from_players_detail[k][CHONG_FENG_JI_TYPE] = seats[i].bet;
-                        //break;
+                    //seats[i].bet += CHONG_FEN_JI_BET;
+                    //seats[k].bet -= CHONG_FEN_JI_BET;
+                    //seats[i].score_from_players_detail[k][CHONG_FENG_JI_TYPE] = seats[i].bet;
+                    //break;
                     //case ZE_REN_JI:
-                        //seats[i].bet += ZE_REN_JI_BET;
-                        //seats[k].bet -= ZE_REN_JI_BET;
-                        //seats[i].score_from_players_detail[k][ZE_REN_JI_TYPE] = seats[i].bet;
-                        //break;
+                    //seats[i].bet += ZE_REN_JI_BET;
+                    //seats[k].bet -= ZE_REN_JI_BET;
+                    //seats[i].score_from_players_detail[k][ZE_REN_JI_TYPE] = seats[i].bet;
+                    //break;
                 }
             }
         }
 
         if (bao_ji == 1) //包鸡玩法
         {
+            int c = 1;
+            if (i != win_seatid && seats[i].gang_hu_flag != 1 && seats[i].pao_hu_flag != 1 && seats[i].hole_cards.ting_cards.size() == 0) //听牌玩家也算鸡分
+            {
+                c = -1; //给其它玩家分
+            }
+            if (seats[i].has_yao_ji >= 1)
+            {
+                if (c == 1)
+                {
+                    score_from_players_item_count[i][YAO_JI_TYPE] += seats[i].has_yao_ji;
+                }
+            }
+            if (seats[i].has_wu_gu_ji >= 1)
+            {
+                if (c == 1)
+                {
+                    score_from_players_item_count[i][WU_GU_JI_TYPE] += seats[i].has_wu_gu_ji;
+                }
+            }
             for (int j = 0; j < seat_max; j++)
             {
                 if (i == j)
@@ -5144,125 +5216,141 @@ void Table::update_account_bet()
                 {
                     continue;
                 }
-                int c = 1;
-                if (i != win_seatid && seats[i].gang_hu_flag != 1 && seats[i].pao_hu_flag != 1 && seats[i].hole_cards.ting_cards.size() == 0) //听牌玩家也算鸡分
-                { 
-                    c = -1;//给其它玩家分
-                }
-                if( seats[i].has_chong_feng_ji == 1 )
-                {//c为1时,拿到冲锋鸡的获取其它玩家的分
+                if (seats[i].has_chong_feng_ji == 1)
+                { //c为1时,拿到冲锋鸡的获取其它玩家的分
                     if (seats[i].has_jin_ji == 1)
-                    {//有金鸡时翻倍
-                        seats[i].bet += 4*c;
-                        seats[j].bet -= 4*c;
-                        if (c == 1 )
+                    { //有金鸡时翻倍
+                        // seats[i].bet += 4*c;
+                        // seats[j].bet -= 4*c;
+                        if (c == 1)
                         {
                             seats[i].score_from_players_detail[j][CHONG_FENG_JI_TYPE] = 4;
-                            score_from_players_item_count[i][CHONG_FENG_JI_TYPE]++;
+                            score_from_players_item_count[i][CHONG_FENG_JI_TYPE] = 1;
                             score_to_players_item_count[j][CHONG_FENG_JI_TYPE]++;
                         }
                         else
                         {
                             seats[j].score_from_players_detail[i][CHONG_FENG_JI_TYPE] = 4;
-                            score_from_players_item_count[j][CHONG_FENG_JI_TYPE]++;
+                            score_from_players_item_count[j][CHONG_FENG_JI_TYPE] = 1;
                             score_to_players_item_count[i][CHONG_FENG_JI_TYPE]++;
                         }
                         mjlog.debug("jipai seats[%d] you chong feng ji fen bei.\n", i);
                     }
-                    else 
+                    else
                     {
-                        seats[i].bet += 2*c;
-                        seats[j].bet -= 2*c;
-                        if (c == 1 )
+                        // seats[i].bet += 2*c;
+                        // seats[j].bet -= 2*c;
+                        if (c == 1)
                         {
                             seats[i].score_from_players_detail[j][CHONG_FENG_JI_TYPE] = 2;
-                            score_from_players_item_count[i][CHONG_FENG_JI_TYPE]++;
+                            score_from_players_item_count[i][CHONG_FENG_JI_TYPE] = 1;
                             score_to_players_item_count[j][CHONG_FENG_JI_TYPE]++;
                         }
                         else
                         {
                             seats[j].score_from_players_detail[i][CHONG_FENG_JI_TYPE] = 2;
-                            score_from_players_item_count[j][CHONG_FENG_JI_TYPE]++;
+                            score_from_players_item_count[j][CHONG_FENG_JI_TYPE] = 1;
                             score_to_players_item_count[i][CHONG_FENG_JI_TYPE]++;
                         }
                         mjlog.debug("jipai seats[%d] you chong feng ji.\n", i);
                     }
                 }
-                if( seats[i].has_chong_feng_wu_gu_ji == 1 )
-                {//c为1时,拿到冲锋乌骨鸡的获取给其它玩家分
-                    seats[i].bet += 2*c;
-                    seats[j].bet -= 2*c;
-                    if (c == 1 )
+                if (seats[i].has_chong_feng_wu_gu_ji == 1)
+                { //c为1时,拿到冲锋乌骨鸡的获取给其它玩家分
+                    // seats[i].bet += 2*c;
+                    // seats[j].bet -= 2*c;
+                    if (c == 1)
                     {
                         seats[i].score_from_players_detail[j][CHONG_FENG_WU_GU_JI_TYPE] = 2;
-                        score_from_players_item_count[i][CHONG_FENG_WU_GU_JI_TYPE]++;
+                        score_from_players_item_count[i][CHONG_FENG_WU_GU_JI_TYPE] = 1;
                         score_to_players_item_count[j][CHONG_FENG_WU_GU_JI_TYPE]++;
                     }
                     else
                     {
                         seats[j].score_from_players_detail[i][CHONG_FENG_WU_GU_JI_TYPE] = 2;
-                        score_from_players_item_count[j][CHONG_FENG_WU_GU_JI_TYPE]++;
+                        score_from_players_item_count[j][CHONG_FENG_WU_GU_JI_TYPE] = 1;
                         score_to_players_item_count[i][CHONG_FENG_WU_GU_JI_TYPE]++;
                     }
-                    mjlog.debug("jipai seats[%d] you wu gu ji.\n", i);
+                    mjlog.debug("jipai seats[%d] you chong feng wu gu ji.\n", i);
                 }
-                if( seats[i].has_ze_ren_ji == 1  || seats[i].has_wu_gu_ze_ren_ji == 1)
+                if (seats[i].has_ze_ren_ji == 1)
                 {
-                    seats[i].bet += 2 * c;
-                    seats[j].bet -= 2 * c;
+                    // seats[i].bet += 2 * c;
+                    // seats[j].bet -= 2 * c;
                     if (c == 1)
                     {
                         seats[i].score_from_players_detail[j][ZE_REN_JI_TYPE] = 2;
-                        score_from_players_item_count[i][ZE_REN_JI_TYPE]++;
+                        score_from_players_item_count[i][ZE_REN_JI_TYPE] = 1;
                         score_to_players_item_count[j][ZE_REN_JI_TYPE]++;
                     }
                     else
                     {
                         seats[j].score_from_players_detail[i][ZE_REN_JI_TYPE] = 2;
-                        score_from_players_item_count[j][ZE_REN_JI_TYPE]++;
+                        score_from_players_item_count[j][ZE_REN_JI_TYPE] = 1;
                         score_to_players_item_count[i][ZE_REN_JI_TYPE]++;
                     }
                     mjlog.debug("jipai seats[%d] you ze ren ji.\n", i);
                 }
-                if( seats[i].has_yao_ji >= 1 )
+                if (seats[i].has_wu_gu_ze_ren_ji == 1)
                 {
-                    seats[i].bet += 1 * c;
-                    seats[j].bet -= 1 * c;
+                    // seats[i].bet += 2 * c;
+                    // seats[j].bet -= 2 * c;
+                    if (c == 1)
+                    {
+                        seats[i].score_from_players_detail[j][ZE_REN_JI_TYPE] = 2;
+                        score_from_players_item_count[i][ZE_REN_JI_TYPE] = 1;
+                        if (seats[i].has_ze_ren_ji == 1)
+                            score_from_players_item_count[i][ZE_REN_JI_TYPE] = 2;
+
+                        score_to_players_item_count[j][ZE_REN_JI_TYPE]++;
+                    }
+                    else
+                    {
+                        seats[j].score_from_players_detail[i][ZE_REN_JI_TYPE] = 2;
+                        score_from_players_item_count[j][ZE_REN_JI_TYPE] = 1;
+                        if (seats[i].has_ze_ren_ji == 1)
+                            score_from_players_item_count[j][ZE_REN_JI_TYPE] = 2;
+                        score_to_players_item_count[i][ZE_REN_JI_TYPE]++;
+                    }
+                    mjlog.debug("jipai seats[%d] you wu gu ze ren ji.\n", i);
+                }
+                if (seats[i].has_yao_ji >= 1)
+                {
+                    // seats[i].bet += 1 * c;
+                    // seats[j].bet -= 1 * c;
                     if (c == 1)
                     {
                         seats[i].score_from_players_detail[j][YAO_JI_TYPE] += 1;
-                        score_from_players_item_count[i][YAO_JI_TYPE]++;
                         score_to_players_item_count[j][YAO_JI_TYPE]++;
                     }
                     else
                     {
                         seats[j].score_from_players_detail[i][YAO_JI_TYPE] += 1;
-                        score_from_players_item_count[j][YAO_JI_TYPE]++;
+                        score_from_players_item_count[j][YAO_JI_TYPE] += seats[i].has_yao_ji;
                         score_to_players_item_count[i][YAO_JI_TYPE]++;
                     }
                     mjlog.debug("jipai seats[%d] you yao ji cnt[%d].\n", i, seats[i].has_yao_ji);
                 }
-                if( seats[i].has_wu_gu_ji >= 1)
+                if (seats[i].has_wu_gu_ji >= 1)
                 {
-                    seats[i].bet += 1 * c;
-                    seats[j].bet -= 1 * c;
+                    // seats[i].bet += 1 * c;
+                    // seats[j].bet -= 1 * c;
                     if (c == 1)
                     {
                         seats[i].score_from_players_detail[j][WU_GU_JI_TYPE] += 1;
-                        score_from_players_item_count[i][WU_GU_JI_TYPE]++;
                         score_to_players_item_count[j][WU_GU_JI_TYPE]++;
                     }
                     else
                     {
                         seats[j].score_from_players_detail[i][WU_GU_JI_TYPE] += 1;
-                        score_from_players_item_count[j][WU_GU_JI_TYPE]++;
+                        score_from_players_item_count[j][WU_GU_JI_TYPE] += seats[i].has_wu_gu_ji;
                         score_to_players_item_count[i][WU_GU_JI_TYPE]++;
                     }
                     mjlog.debug("jipai seats[%d] you wu gu ji cnt[%d].\n", i, seats[i].has_wu_gu_ji);
                 }
             }
         }
-    }     
+    }
 
     for (int i = 0; i < seat_max; i++)
     {
@@ -5272,13 +5360,13 @@ void Table::update_account_bet()
         }
         mjlog.debug("seatid[%d]------------------------------------\n", i);
         std::map<int, std::map<int, int> >::iterator ite = seats[i].score_from_players_detail.begin();
-        for(; ite != seats[i].score_from_players_detail.end(); ite++)
+        for (; ite != seats[i].score_from_players_detail.end(); ite++)
         {
-            std::map<int ,int > &secondValue = ite->second;
+            std::map<int, int> &secondValue = ite->second;
             int firstValue = ite->first;
 
-            std::map<int, int> ::iterator inner_ite = secondValue.begin();
-            for(; inner_ite != secondValue.end(); inner_ite++)
+            std::map<int, int>::iterator inner_ite = secondValue.begin();
+            for (; inner_ite != secondValue.end(); inner_ite++)
             {
                 mjlog.debug("#chu_fen_seatid[%d]  chu_fen_type[%d]  chu_fen[%d]\n", firstValue, inner_ite->first, inner_ite->second);
             }
@@ -5294,130 +5382,130 @@ void Table::update_account_bet()
             continue;
         }
         std::map<int, std::map<int, int> >::iterator ite = seats[i].score_from_players_detail.begin();
-        for(; ite != seats[i].score_from_players_detail.end(); ite++)
+        for (; ite != seats[i].score_from_players_detail.end(); ite++)
         {
-            std::map<int ,int > &secondValue = ite->second;
+            std::map<int, int> &secondValue = ite->second;
             int firstValue = ite->first;
             //胡
-            if ( secondValue.find(PAO_HU_TYPE) != secondValue.end() ) 
+            if (secondValue.find(PAO_HU_TYPE) != secondValue.end())
             {
-                score_from_players_item_total[i][PAO_HU_TYPE] = secondValue[PAO_HU_TYPE];
+                score_from_players_item_total[i][PAO_HU_TYPE] += secondValue[PAO_HU_TYPE];
 
-                score_to_players_item_total[firstValue][PAO_HU_TYPE] = secondValue[PAO_HU_TYPE];
-                mjlog.debug("score item pao_hu_type# from[%d] cnt[%d] to[%d] cnt[%d] \n",score_from_players_item_total[i][PAO_HU_TYPE] , score_from_players_item_count[i][PAO_HU_TYPE],
-                        score_to_players_item_total[firstValue][PAO_HU_TYPE], score_to_players_item_count[firstValue][PAO_HU_TYPE]);
+                score_to_players_item_total[firstValue][PAO_HU_TYPE] += secondValue[PAO_HU_TYPE];
+                mjlog.debug("score item pao_hu_type# from[%d] cnt[%d] to[%d] cnt[%d] \n", score_from_players_item_total[i][PAO_HU_TYPE], score_from_players_item_count[i][PAO_HU_TYPE],
+                            score_to_players_item_total[firstValue][PAO_HU_TYPE], score_to_players_item_count[firstValue][PAO_HU_TYPE]);
             }
-            if ( secondValue.find(GANG_HU_TYPE) != secondValue.end() ) 
+            if (secondValue.find(GANG_HU_TYPE) != secondValue.end())
             {
-                score_from_players_item_total[i][GANG_HU_TYPE] = secondValue[GANG_HU_TYPE];
+                score_from_players_item_total[i][GANG_HU_TYPE] += secondValue[GANG_HU_TYPE];
 
                 score_to_players_item_total[firstValue][GANG_HU_TYPE] = secondValue[GANG_HU_TYPE];
-                mjlog.debug("score item gang_hu_type# from[%d] cnt[%d] to[%d] cnt[%d] \n",score_from_players_item_total[i][GANG_HU_TYPE] , score_from_players_item_count[i][GANG_HU_TYPE],
-                        score_to_players_item_total[firstValue][GANG_HU_TYPE], score_to_players_item_count[firstValue][GANG_HU_TYPE]);
+                mjlog.debug("score item gang_hu_type# from[%d] cnt[%d] to[%d] cnt[%d] \n", score_from_players_item_total[i][GANG_HU_TYPE], score_from_players_item_count[i][GANG_HU_TYPE],
+                            score_to_players_item_total[firstValue][GANG_HU_TYPE], score_to_players_item_count[firstValue][GANG_HU_TYPE]);
             }
-            if ( secondValue.find(ZI_MO_TYPE) != secondValue.end() ) 
+            if (secondValue.find(ZI_MO_TYPE) != secondValue.end())
             {
-                score_from_players_item_total[i][ZI_MO_TYPE] = secondValue[ZI_MO_TYPE];
+                score_from_players_item_total[i][ZI_MO_TYPE] += secondValue[ZI_MO_TYPE];
 
-                mjlog.debug("score item zi_mo_type# from[%d] cnt[%d]\n",score_from_players_item_total[i][ZI_MO_TYPE] , score_from_players_item_count[i][ZI_MO_TYPE]);
+                mjlog.debug("score item zi_mo_type# from[%d] cnt[%d]\n", score_from_players_item_total[i][ZI_MO_TYPE], score_from_players_item_count[i][ZI_MO_TYPE]);
                 for (int j = 0; j < seat_max; j++)
                 {
                     if (seats[j].ready != 1 || i == j)
                     {
                         continue;
                     }
-                    score_to_players_item_total[j][ZI_MO_TYPE] = secondValue[ZI_MO_TYPE] / (max_ready_players - 1);
+                    score_to_players_item_total[j][ZI_MO_TYPE] += secondValue[ZI_MO_TYPE] / (max_ready_players - 1);
                     mjlog.debug("score item zi_mo_type# to[%d] cnt[%d] \n", score_to_players_item_total[j][ZI_MO_TYPE], score_to_players_item_count[j][ZI_MO_TYPE]);
                 }
             }
             //连庄
-            if ( secondValue.find(LIAN_ZHUANG_TYPE) != secondValue.end() ) 
+            if (secondValue.find(LIAN_ZHUANG_TYPE) != secondValue.end())
             {
-                score_from_players_item_total[i][LIAN_ZHUANG_TYPE] = secondValue[LIAN_ZHUANG_TYPE];
+                score_from_players_item_total[i][LIAN_ZHUANG_TYPE] += secondValue[LIAN_ZHUANG_TYPE];
 
-                score_to_players_item_total[firstValue][LIAN_ZHUANG_TYPE] = secondValue[LIAN_ZHUANG_TYPE];
-                mjlog.debug("score item lian_zhuang_type# from[%d] cnt[%d] to[%d] cnt[%d] \n",score_from_players_item_total[i][LIAN_ZHUANG_TYPE] , score_from_players_item_count[i][LIAN_ZHUANG_TYPE],
-                        score_to_players_item_total[firstValue][LIAN_ZHUANG_TYPE], score_to_players_item_count[firstValue][LIAN_ZHUANG_TYPE]);
+                score_to_players_item_total[firstValue][LIAN_ZHUANG_TYPE] += secondValue[LIAN_ZHUANG_TYPE];
+                mjlog.debug("score item lian_zhuang_type# from[%d] cnt[%d] to[%d] cnt[%d] \n", score_from_players_item_total[i][LIAN_ZHUANG_TYPE], score_from_players_item_count[i][LIAN_ZHUANG_TYPE],
+                            score_to_players_item_total[firstValue][LIAN_ZHUANG_TYPE], score_to_players_item_count[firstValue][LIAN_ZHUANG_TYPE]);
             }
-        
+
             //鸡
-            if ( secondValue.find(YAO_BAI_JI_TYPE) != secondValue.end() ) 
+            if (secondValue.find(YAO_BAI_JI_TYPE) != secondValue.end())
             {
-                score_from_players_item_total[i][YAO_BAI_JI_TYPE] = secondValue[YAO_BAI_JI_TYPE];
-                score_to_players_item_total[firstValue][YAO_BAI_JI_TYPE] = secondValue[YAO_BAI_JI_TYPE];
-                mjlog.debug("score item yao_bai_ji_type# from[%d] cnt[%d] to[%d] cnt[%d] \n",score_from_players_item_total[i][YAO_BAI_JI_TYPE] , score_from_players_item_count[i][YAO_BAI_JI_TYPE],
-                        score_to_players_item_total[firstValue][YAO_BAI_JI_TYPE], score_to_players_item_count[firstValue][YAO_BAI_JI_TYPE]);
+                score_from_players_item_total[i][YAO_BAI_JI_TYPE] += secondValue[YAO_BAI_JI_TYPE];
+                score_to_players_item_total[firstValue][YAO_BAI_JI_TYPE] += secondValue[YAO_BAI_JI_TYPE];
+                mjlog.debug("score item yao_bai_ji_type# from[%d] cnt[%d] to[%d] cnt[%d] \n", score_from_players_item_total[i][YAO_BAI_JI_TYPE], score_from_players_item_count[i][YAO_BAI_JI_TYPE],
+                            score_to_players_item_total[firstValue][YAO_BAI_JI_TYPE], score_to_players_item_count[firstValue][YAO_BAI_JI_TYPE]);
             }
-            if ( secondValue.find(BEN_JI_TYPE) != secondValue.end() ) 
+            if (secondValue.find(BEN_JI_TYPE) != secondValue.end())
             {
-                score_from_players_item_total[i][BEN_JI_TYPE] = secondValue[BEN_JI_TYPE];
-                score_to_players_item_total[firstValue][BEN_JI_TYPE] = secondValue[BEN_JI_TYPE];
-                mjlog.debug("score item ben_ji_type# from[%d] cnt[%d] to[%d] cnt[%d] \n",score_from_players_item_total[i][BEN_JI_TYPE] , score_from_players_item_count[i][BEN_JI_TYPE],
-                        score_to_players_item_total[firstValue][BEN_JI_TYPE], score_to_players_item_count[firstValue][BEN_JI_TYPE]);
+                score_from_players_item_total[i][BEN_JI_TYPE] += secondValue[BEN_JI_TYPE];
+                score_to_players_item_total[firstValue][BEN_JI_TYPE] += secondValue[BEN_JI_TYPE];
+                mjlog.debug("score item ben_ji_type# from[%d] cnt[%d] to[%d] cnt[%d] \n", score_from_players_item_total[i][BEN_JI_TYPE], score_from_players_item_count[i][BEN_JI_TYPE],
+                            score_to_players_item_total[firstValue][BEN_JI_TYPE], score_to_players_item_count[firstValue][BEN_JI_TYPE]);
             }
-            if ( secondValue.find(WU_GU_JI_TYPE) != secondValue.end() ) 
+            if (secondValue.find(WU_GU_JI_TYPE) != secondValue.end())
             {
-                score_from_players_item_total[i][WU_GU_JI_TYPE] = secondValue[WU_GU_JI_TYPE];
-                score_to_players_item_total[firstValue][WU_GU_JI_TYPE] = secondValue[WU_GU_JI_TYPE];
-                mjlog.debug("score item wu_gu_ji_type# from[%d] cnt[%d] to[%d] cnt[%d] \n",score_from_players_item_total[i][WU_GU_JI_TYPE] , score_from_players_item_count[i][WU_GU_JI_TYPE],
-                        score_to_players_item_total[firstValue][WU_GU_JI_TYPE], score_to_players_item_count[firstValue][WU_GU_JI_TYPE]);
+                score_from_players_item_total[i][WU_GU_JI_TYPE] += secondValue[WU_GU_JI_TYPE];
+                score_to_players_item_total[firstValue][WU_GU_JI_TYPE] += secondValue[WU_GU_JI_TYPE];
+                mjlog.debug("score item wu_gu_ji_type# from[%d] cnt[%d] to[%d] cnt[%d] \n", score_from_players_item_total[i][WU_GU_JI_TYPE], score_from_players_item_count[i][WU_GU_JI_TYPE],
+                            score_to_players_item_total[firstValue][WU_GU_JI_TYPE], score_to_players_item_count[firstValue][WU_GU_JI_TYPE]);
             }
-            if ( secondValue.find(CHONG_FENG_WU_GU_JI_TYPE) != secondValue.end() ) 
+            if (secondValue.find(CHONG_FENG_WU_GU_JI_TYPE) != secondValue.end())
             {
-                score_from_players_item_total[i][CHONG_FENG_WU_GU_JI_TYPE] = secondValue[CHONG_FENG_WU_GU_JI_TYPE];
-                score_to_players_item_total[firstValue][CHONG_FENG_WU_GU_JI_TYPE] = secondValue[CHONG_FENG_WU_GU_JI_TYPE];
+                score_from_players_item_total[i][CHONG_FENG_WU_GU_JI_TYPE] += secondValue[CHONG_FENG_WU_GU_JI_TYPE];
+                score_to_players_item_total[firstValue][CHONG_FENG_WU_GU_JI_TYPE] += secondValue[CHONG_FENG_WU_GU_JI_TYPE];
 
-                mjlog.debug("score item chong_feng_wu_gu_ji_type# from[%d] cnt[%d] to[%d] cnt[%d] \n",score_from_players_item_total[i][CHONG_FENG_WU_GU_JI_TYPE] , score_from_players_item_count[i][CHONG_FENG_WU_GU_JI_TYPE],
-                        score_to_players_item_total[firstValue][CHONG_FENG_WU_GU_JI_TYPE], score_to_players_item_count[firstValue][CHONG_FENG_WU_GU_JI_TYPE]);
+                mjlog.debug("score item chong_feng_wu_gu_ji_type# from[%d] cnt[%d] to[%d] cnt[%d] \n", score_from_players_item_total[i][CHONG_FENG_WU_GU_JI_TYPE], score_from_players_item_count[i][CHONG_FENG_WU_GU_JI_TYPE],
+                            score_to_players_item_total[firstValue][CHONG_FENG_WU_GU_JI_TYPE], score_to_players_item_count[firstValue][CHONG_FENG_WU_GU_JI_TYPE]);
             }
-            if ( secondValue.find(YAO_JI_TYPE) != secondValue.end() ) 
+            if (secondValue.find(YAO_JI_TYPE) != secondValue.end())
             {
-                score_from_players_item_total[i][YAO_JI_TYPE] = secondValue[YAO_JI_TYPE];
-                score_to_players_item_total[firstValue][YAO_JI_TYPE] = secondValue[YAO_JI_TYPE];
-                mjlog.debug("score item yao_ji_type# from[%d] cnt[%d] to[%d] cnt[%d] \n",score_from_players_item_total[i][YAO_JI_TYPE] , score_from_players_item_count[i][YAO_JI_TYPE],
-                        score_to_players_item_total[firstValue][YAO_JI_TYPE], score_to_players_item_count[firstValue][YAO_JI_TYPE]);
+                score_from_players_item_total[i][YAO_JI_TYPE] += secondValue[YAO_JI_TYPE];
+                score_to_players_item_total[firstValue][YAO_JI_TYPE] += secondValue[YAO_JI_TYPE];
+                mjlog.debug("score item yao_ji_type# from[%d] cnt[%d] to[%d] cnt[%d] \n", score_from_players_item_total[i][YAO_JI_TYPE], score_from_players_item_count[i][YAO_JI_TYPE],
+                            score_to_players_item_total[firstValue][YAO_JI_TYPE], score_to_players_item_count[firstValue][YAO_JI_TYPE]);
             }
-            if ( secondValue.find(CHONG_FENG_JI_TYPE) != secondValue.end() ) 
+            if (secondValue.find(CHONG_FENG_JI_TYPE) != secondValue.end())
             {
-                score_from_players_item_total[i][CHONG_FENG_JI_TYPE] = secondValue[CHONG_FENG_JI_TYPE];
-                score_to_players_item_total[firstValue][CHONG_FENG_JI_TYPE] = secondValue[CHONG_FENG_JI_TYPE];
-                mjlog.debug("score item chong_feng_ji_type# from[%d] cnt[%d] to[%d] cnt[%d] \n",score_from_players_item_total[i][CHONG_FENG_JI_TYPE] , score_from_players_item_count[i][CHONG_FENG_JI_TYPE],
-                        score_to_players_item_total[firstValue][CHONG_FENG_JI_TYPE], score_to_players_item_count[firstValue][CHONG_FENG_JI_TYPE]);
+                score_from_players_item_total[i][CHONG_FENG_JI_TYPE] += secondValue[CHONG_FENG_JI_TYPE];
+                score_to_players_item_total[firstValue][CHONG_FENG_JI_TYPE] += secondValue[CHONG_FENG_JI_TYPE];
+                mjlog.debug("score item chong_feng_ji_type# from[%d] cnt[%d] to[%d] cnt[%d] \n", score_from_players_item_total[i][CHONG_FENG_JI_TYPE], score_from_players_item_count[i][CHONG_FENG_JI_TYPE],
+                            score_to_players_item_total[firstValue][CHONG_FENG_JI_TYPE], score_to_players_item_count[firstValue][CHONG_FENG_JI_TYPE]);
             }
-            if ( secondValue.find(ZE_REN_JI_TYPE) != secondValue.end() ) 
+            if (secondValue.find(ZE_REN_JI_TYPE) != secondValue.end())
             {
-                score_from_players_item_total[i][ZE_REN_JI_TYPE] = secondValue[ZE_REN_JI_TYPE];
-                score_to_players_item_total[firstValue][ZE_REN_JI_TYPE] = secondValue[ZE_REN_JI_TYPE];
-                mjlog.debug("score item ze_ren_ji_type# from[%d] cnt[%d] to[%d] cnt[%d] \n",score_from_players_item_total[i][ZE_REN_JI_TYPE] , score_from_players_item_count[i][ZE_REN_JI_TYPE],
-                        score_to_players_item_total[firstValue][ZE_REN_JI_TYPE], score_to_players_item_count[firstValue][ZE_REN_JI_TYPE]);
+                score_from_players_item_total[i][ZE_REN_JI_TYPE] += secondValue[ZE_REN_JI_TYPE];
+                score_to_players_item_total[firstValue][ZE_REN_JI_TYPE] += secondValue[ZE_REN_JI_TYPE];
+                mjlog.debug("score item ze_ren_ji_type# from[%d] cnt[%d] to[%d] cnt[%d] \n", score_from_players_item_total[i][ZE_REN_JI_TYPE], score_from_players_item_count[i][ZE_REN_JI_TYPE],
+                            score_to_players_item_total[firstValue][ZE_REN_JI_TYPE], score_to_players_item_count[firstValue][ZE_REN_JI_TYPE]);
             }
-            if ( secondValue.find(JIN_JI_TYPE) != secondValue.end() ) 
+            if (secondValue.find(JIN_JI_TYPE) != secondValue.end())
             {
-                score_from_players_item_total[i][JIN_JI_TYPE] = secondValue[JIN_JI_TYPE];
-                score_to_players_item_total[firstValue][JIN_JI_TYPE] = secondValue[JIN_JI_TYPE];
-                mjlog.debug("score item jin_ji_type# from[%d] cnt[%d] to[%d] cnt[%d] \n",score_from_players_item_total[i][JIN_JI_TYPE] , score_from_players_item_count[i][JIN_JI_TYPE],
-                        score_to_players_item_total[firstValue][JIN_JI_TYPE], score_to_players_item_count[firstValue][JIN_JI_TYPE]);
+                score_from_players_item_total[i][JIN_JI_TYPE] += secondValue[JIN_JI_TYPE];
+                score_to_players_item_total[firstValue][JIN_JI_TYPE] += secondValue[JIN_JI_TYPE];
+                mjlog.debug("score item jin_ji_type# from[%d] cnt[%d] to[%d] cnt[%d] \n", score_from_players_item_total[i][JIN_JI_TYPE], score_from_players_item_count[i][JIN_JI_TYPE],
+                            score_to_players_item_total[firstValue][JIN_JI_TYPE], score_to_players_item_count[firstValue][JIN_JI_TYPE]);
             }
-            if ( secondValue.find(BAO_JI_TYPE) != secondValue.end() ) 
+            if (secondValue.find(BAO_JI_TYPE) != secondValue.end())
             {
-                score_from_players_item_total[i][BAO_JI_TYPE] = secondValue[BAO_JI_TYPE];
-                score_to_players_item_total[firstValue][BAO_JI_TYPE] = secondValue[BAO_JI_TYPE];
-                mjlog.debug("score item bao_ji_type# from[%d] cnt[%d] to[%d] cnt[%d] \n",score_from_players_item_total[i][BAO_JI_TYPE] , score_from_players_item_count[i][BAO_JI_TYPE],
-                        score_to_players_item_total[firstValue][BAO_JI_TYPE], score_to_players_item_count[firstValue][BAO_JI_TYPE]);
+                score_from_players_item_total[i][BAO_JI_TYPE] += secondValue[BAO_JI_TYPE];
+                score_to_players_item_total[firstValue][BAO_JI_TYPE] += secondValue[BAO_JI_TYPE];
+                mjlog.debug("score item bao_ji_type# from[%d] cnt[%d] to[%d] cnt[%d] \n", score_from_players_item_total[i][BAO_JI_TYPE], score_from_players_item_count[i][BAO_JI_TYPE],
+                            score_to_players_item_total[firstValue][BAO_JI_TYPE], score_to_players_item_count[firstValue][BAO_JI_TYPE]);
             }
 
             //杠
-            if ( secondValue.find(MING_GANG_TYPE) != secondValue.end() ) 
+            if (secondValue.find(MING_GANG_TYPE) != secondValue.end())
             {
-                score_from_players_item_total[i][MING_GANG_TYPE] = secondValue[MING_GANG_TYPE];
-                score_to_players_item_total[firstValue][MING_GANG_TYPE] = secondValue[MING_GANG_TYPE];
-                mjlog.debug("score item ming_gang_type# from[%d] cnt[%d] to[%d] cnt[%d] \n",score_from_players_item_total[i][MING_GANG_TYPE] , score_from_players_item_count[i][MING_GANG_TYPE],
-                        score_to_players_item_total[firstValue][MING_GANG_TYPE], score_to_players_item_count[firstValue][MING_GANG_TYPE]);
+                score_from_players_item_total[i][MING_GANG_TYPE] += secondValue[MING_GANG_TYPE];
+                score_to_players_item_total[firstValue][MING_GANG_TYPE] += secondValue[MING_GANG_TYPE];
+                mjlog.debug("score item ming_gang_type# from[%d] cnt[%d] to[%d] cnt[%d] \n", score_from_players_item_total[i][MING_GANG_TYPE], score_from_players_item_count[i][MING_GANG_TYPE],
+                            score_to_players_item_total[firstValue][MING_GANG_TYPE], score_to_players_item_count[firstValue][MING_GANG_TYPE]);
             }
-            if ( secondValue.find(PENG_GANG_TYPE) != secondValue.end() ) 
+            if (secondValue.find(PENG_GANG_TYPE) != secondValue.end())
             {
-                score_from_players_item_total[i][PENG_GANG_TYPE] = secondValue[PENG_GANG_TYPE];
-                mjlog.debug("score item peng_gang_type# from[%d] cnt[%d]\n",score_from_players_item_total[i][PENG_GANG_TYPE] , score_from_players_item_count[i][PENG_GANG_TYPE]);
+                score_from_players_item_total[i][PENG_GANG_TYPE] += (max_ready_players - 1) * secondValue[PENG_GANG_TYPE];
+                mjlog.debug("score item peng_gang_type# from[%d] cnt[%d]\n", score_from_players_item_total[i][PENG_GANG_TYPE], score_from_players_item_count[i][PENG_GANG_TYPE]);
 
                 for (int j = 0; j < seat_max; j++)
                 {
@@ -5425,14 +5513,14 @@ void Table::update_account_bet()
                     {
                         continue;
                     }
-                    score_to_players_item_total[j][PENG_GANG_TYPE] = secondValue[PENG_GANG_TYPE] / (max_ready_players - 1);
+                    score_to_players_item_total[j][PENG_GANG_TYPE] += secondValue[PENG_GANG_TYPE];
                     mjlog.debug("score item peng_gang_type# to[%d] cnt[%d] \n", score_to_players_item_total[j][PENG_GANG_TYPE], score_to_players_item_count[j][PENG_GANG_TYPE]);
                 }
             }
-            if ( secondValue.find(AN_GANG_TYPE) != secondValue.end() ) 
+            if (secondValue.find(AN_GANG_TYPE) != secondValue.end())
             {
-                score_from_players_item_total[i][AN_GANG_TYPE] = secondValue[AN_GANG_TYPE];
-                mjlog.debug("score item an_gang_type# from[%d] cnt[%d]\n",score_from_players_item_total[i][AN_GANG_TYPE] , score_from_players_item_count[i][AN_GANG_TYPE]);
+                score_from_players_item_total[i][AN_GANG_TYPE] += (max_ready_players - 1) * secondValue[AN_GANG_TYPE];
+                mjlog.debug("score item an_gang_type# from[%d] cnt[%d]\n", score_from_players_item_total[i][AN_GANG_TYPE], score_from_players_item_count[i][AN_GANG_TYPE]);
 
                 for (int j = 0; j < seat_max; j++)
                 {
@@ -5440,41 +5528,55 @@ void Table::update_account_bet()
                     {
                         continue;
                     }
-                    score_to_players_item_total[j][AN_GANG_TYPE] = secondValue[AN_GANG_TYPE] / (max_ready_players - 1);
+                    score_to_players_item_total[j][AN_GANG_TYPE] += secondValue[AN_GANG_TYPE];
                     mjlog.debug("score item an_gang_type# to[%d] cnt[%d] \n", score_to_players_item_total[j][AN_GANG_TYPE], score_to_players_item_count[j][AN_GANG_TYPE]);
                 }
-            } 
-            
-            //叫牌
-            if ( secondValue.find(JIAO_PAI_TYPE) != secondValue.end() ) 
-            {
-                score_from_players_item_total[i][JIAO_PAI_TYPE] = secondValue[JIAO_PAI_TYPE];
-
-                score_to_players_item_total[firstValue][JIAO_PAI_TYPE] += secondValue[JIAO_PAI_TYPE];
-                mjlog.debug("score item jiao pai_type# from[%d] cnt[%d] to[%d] cnt[%d] \n",score_from_players_item_total[i][JIAO_PAI_TYPE] , score_from_players_item_count[i][JIAO_PAI_TYPE],
-                        score_to_players_item_total[firstValue][JIAO_PAI_TYPE], score_to_players_item_count[firstValue][JIAO_PAI_TYPE]);
             }
         }
         mjlog.debug("upper player seatid[%d]------------------------------------------------\n", i);
     }
-    
-    //统计各个玩家每项的出分。
+
+    //统计各个玩家每项的总分。
     for (int i = 0; i < seat_max; i++)
     {
-        Player* player = seats[i].player;
+        if (seats[i].ready != 1)
+        {
+            continue;
+        }
+        std::map<int, int>::iterator ite = score_from_players_item_total[i].begin();
+        for (; ite != score_from_players_item_total[i].end(); ite++)
+        {
+            score_from_players_total[i] += ite->second;
+            mjlog.debug("seatid[%d] fen_type[%d] jin_fen[%d]\n", i, ite->first, ite->second);
+        }
+        std::map<int, int>::iterator ite2 = score_to_players_item_total[i].begin();
+        for (; ite2 != score_to_players_item_total[i].end(); ite2++)
+        {
+            score_from_players_total[i] -= ite2->second;
+            mjlog.debug("seatid[%d] fen_type[%d] chu_fen[%d]\n", i, ite2->first, ite2->second);
+        }
+        mjlog.debug("-----------------------------------------------\n");
+        seats[i].bet = score_from_players_total[i];
+    }
+
+    for (int i = 0; i < seat_max; i++)
+    {
+        Player *player = seats[i].player;
         if (player == NULL)
         {
             continue;
         }
         mjlog.debug("update acount horse, uid[%d], money[%d], bet[%d]\n", player->uid, player->money, seats[i].bet);
-    }    
+    }
 }
 
 // action: 0 为发牌状态，1为吃牌，2为碰牌，3为杠牌，4为摸牌
-void Table::dump_hole_cards(std::vector<Card>& cards, int seatid, int action)
+void Table::dump_hole_cards(std::vector<Card> &cards, int seatid, int action)
 {
-    char buff[256] = {0, };
-    const char* action_desc[] = {"发牌", "吃", "碰", "杠", "摸牌", "出牌"};
+    char buff[256] = {
+        0,
+    };
+    const char *action_desc[] = {"发牌", "吃", "碰", "杠", "摸牌", "出牌"};
 
     std::vector<Card>::iterator it = cards.begin();
     for (; it != cards.end(); it++)
@@ -5484,7 +5586,7 @@ void Table::dump_hole_cards(std::vector<Card>& cards, int seatid, int action)
     }
 
     mjlog.debug("dumpcards table[%d] uid[%d] seat[%d] action[%s]\n", tid,
-              seats[seatid].player->uid, seatid, action_desc[action]);
+                seats[seatid].player->uid, seatid, action_desc[action]);
     mjlog.debug("dumpcards: %s\n", buff);
 }
 
@@ -5534,7 +5636,7 @@ void Table::check_ip_conflict()
     }
 }
 
-void Table::broadcast_forbid_hu(Player* player, int num)
+void Table::broadcast_forbid_hu(Player *player, int num)
 {
     Jpacket packet;
     packet.val["cmd"] = SERVER_FORBID_HU_BC;
@@ -5547,30 +5649,30 @@ void Table::broadcast_forbid_hu(Player* player, int num)
     broadcast(NULL, packet.tostring());
 }
 
-void Table::handler_gps_notice(Player* player)
+void Table::handler_gps_notice(Player *player)
 {
-   Json::Value &val = player->client->packet.tojson();
-   float jingdu = val["jingdu"].asFloat();
-   float weidu = val["weidu"].asFloat();
+    Json::Value &val = player->client->packet.tojson();
+    float jingdu = val["jingdu"].asFloat();
+    float weidu = val["weidu"].asFloat();
 
-   Seat &seat = seats[player->seatid];
-   seat.jingdu = jingdu;
-   seat.weidu = weidu;
+    Seat &seat = seats[player->seatid];
+    seat.jingdu = jingdu;
+    seat.weidu = weidu;
 
-   player->jin_du = jingdu;
-   player->wei_du = weidu;
+    player->jin_du = jingdu;
+    player->wei_du = weidu;
 
-   Jpacket packet;
-   packet.val["cmd"] = SERVER_GPS_POS_NOTICE_SUCC_UC;
-   packet.val["name"] = player->name;
-   packet.val["uid"] = player->uid;
-   packet.val["seatid"] = player->seatid;
-   packet.end();
+    Jpacket packet;
+    packet.val["cmd"] = SERVER_GPS_POS_NOTICE_SUCC_UC;
+    packet.val["name"] = player->name;
+    packet.val["uid"] = player->uid;
+    packet.val["seatid"] = player->seatid;
+    packet.end();
 
-   unicast(player, packet.tostring());
+    unicast(player, packet.tostring());
 }
 
-void Table::handler_gps_dist_req(Player* player)
+void Table::handler_gps_dist_req(Player *player)
 {
     Json::Value &val = player->client->packet.tojson();
     int seatid = val["seatid"].asInt();
@@ -5589,7 +5691,7 @@ void Table::handler_gps_dist_req(Player* player)
             seatids.insert(next);
         }
     }
-    
+
     for (int i = 1; i < 4; i++)
     {
         int next = (seatid + i) % 4;
@@ -5613,20 +5715,20 @@ double Table::GetDistance(double dLongitude1, double dLatitude1, double dLongitu
 {
     double lat1 = (M_PI / 180) * dLatitude1;
     double lat2 = (M_PI / 180) * dLatitude2;
-    
+
     double lon1 = (M_PI / 180) * dLongitude1;
     double lon2 = (M_PI / 180) * dLongitude2;
-    
+
     //地球半径
     double R = 6378.137;
-    
+
     //两点间距离 km，如果想要米的话，结果*1000就可以了
-    double d =  acos(sin(lat1) * sin(lat2) + cos(lat1) * cos(lat2) * cos(lon2-lon1)) * R;
-    
+    double d = acos(sin(lat1) * sin(lat2) + cos(lat1) * cos(lat2) * cos(lon2 - lon1)) * R;
+
     return d * 1000;
 }
 
-void Table::handler_voice_req(Player* player)
+void Table::handler_voice_req(Player *player)
 {
     Json::Value &val = player->client->packet.tojson();
     string url = val["url"].asString();
@@ -5652,7 +5754,7 @@ void Table::handler_recored_mo(int value, int seat, int other)
     record.seats[1] = MBYTE(other);
     record.action = RECORD_MO;
     record.holes[0] = MBYTE(value);
-	replay.play_record.push_back(record);
+    replay.play_record.push_back(record);
 }
 
 void Table::handler_recored_chi(int value, int pattern[3], int seat, int other)
@@ -5665,10 +5767,10 @@ void Table::handler_recored_chi(int value, int pattern[3], int seat, int other)
 
     for (int i = 0; i < 3; i++)
     {
-		record.holes[i] = MBYTE(pattern[i]);
+        record.holes[i] = MBYTE(pattern[i]);
     }
 
-	replay.play_record.push_back(record);
+    replay.play_record.push_back(record);
 }
 
 void Table::handler_recored_peng(int value, int seat, int other)
@@ -5679,8 +5781,8 @@ void Table::handler_recored_peng(int value, int seat, int other)
     record.seats[1] = MBYTE(other);
     record.action = RECORD_PENG;
     record.holes[0] = MBYTE(value);
-    
-	replay.play_record.push_back(record);
+
+    replay.play_record.push_back(record);
 }
 
 void Table::handler_recored_gang(int value, int seat, int other, int gang_flag)
@@ -5691,9 +5793,9 @@ void Table::handler_recored_gang(int value, int seat, int other, int gang_flag)
     record.seats[1] = MBYTE(other);
     record.action = RECORD_GANG;
     record.flag = MBYTE(gang_flag);
-	record.holes[0] = MBYTE(value);
+    record.holes[0] = MBYTE(value);
 
-	replay.play_record.push_back(record);
+    replay.play_record.push_back(record);
 }
 
 void Table::handler_recored_guo(int value, int seat, int other)
@@ -5703,7 +5805,7 @@ void Table::handler_recored_guo(int value, int seat, int other)
     record.seats[0] = MBYTE(seat);
     record.seats[1] = MBYTE(other);
     record.action = RECORD_GUO;
-	replay.play_record.push_back(record);
+    replay.play_record.push_back(record);
 }
 
 void Table::handler_recored_hu(int value, int seat, int other)
@@ -5713,64 +5815,64 @@ void Table::handler_recored_hu(int value, int seat, int other)
     record.seats[0] = MBYTE(seat);
     record.seats[1] = MBYTE(other);
     record.action = RECORD_HU;
-	if (other > -1)
-	{
-		record.flag = MBYTE(1);
-	}
-	else
-	{
-		record.flag = MBYTE(0);
-	}
+    if (other > -1)
+    {
+        record.flag = MBYTE(1);
+    }
+    else
+    {
+        record.flag = MBYTE(0);
+    }
 
     record.holes[0] = MBYTE(value);
-	replay.play_record.push_back(record);
+    replay.play_record.push_back(record);
 }
 
 void Table::handler_record_horse(int seatid)
 {
-	Seat &seat = seats[seatid];
-	HorseRecord record;
-	memset(&record, 0, sizeof(record));
-	record.seatid = MBYTE(seatid);
-	record.horse_number = MBYTE(seat.horse_cards.size());
-	for (unsigned int i = 0; i < seat.horse_cards.size(); i++)
-	{
-		record.horse[i] = MBYTE(seat.horse_cards[i].value);
-	}
-	for (unsigned int i = 0; i < seat.zhong_horse.size(); i++)
-	{
-		record.zhong[i] = MBYTE(seat.zhong_horse[i]);
-	}
-	replay.horse_record.push_back(record);
+    Seat &seat = seats[seatid];
+    HorseRecord record;
+    memset(&record, 0, sizeof(record));
+    record.seatid = MBYTE(seatid);
+    record.horse_number = MBYTE(seat.horse_cards.size());
+    for (unsigned int i = 0; i < seat.horse_cards.size(); i++)
+    {
+        record.horse[i] = MBYTE(seat.horse_cards[i].value);
+    }
+    for (unsigned int i = 0; i < seat.zhong_horse.size(); i++)
+    {
+        record.zhong[i] = MBYTE(seat.zhong_horse[i]);
+    }
+    replay.horse_record.push_back(record);
 }
 
 void Table::handler_record_notice(int seatid)
 {
-	PlayRecord record;
+    PlayRecord record;
     memset(&record, 0, sizeof(record));
     record.seats[0] = MBYTE(seatid);
     record.action = RECORD_NOTICE;
-	if (actions[NOTICE_CHI])
-	{
-		record.flag |= RECORD_NOTICE_CHI;
-	}
-	if (actions[NOTICE_PENG])
-	{
-		record.flag |= RECORD_NOTICE_PENG;
-	}
-	if (actions[NOTICE_GANG])
-	{
-		record.flag |= RECORD_NOTICE_GANG;
-	}
-	if (actions[NOTICE_HU])
-	{
-		record.flag |= RECORD_NOTICE_HU;
-	}
-	if (actions[NOTICE_GUO])
-	{
-		record.flag |= RECORD_NOTICE_GUO;
-	}
-	replay.play_record.push_back(record);
+    if (actions[NOTICE_CHI])
+    {
+        record.flag |= RECORD_NOTICE_CHI;
+    }
+    if (actions[NOTICE_PENG])
+    {
+        record.flag |= RECORD_NOTICE_PENG;
+    }
+    if (actions[NOTICE_GANG])
+    {
+        record.flag |= RECORD_NOTICE_GANG;
+    }
+    if (actions[NOTICE_HU])
+    {
+        record.flag |= RECORD_NOTICE_HU;
+    }
+    if (actions[NOTICE_GUO])
+    {
+        record.flag |= RECORD_NOTICE_GUO;
+    }
+    replay.play_record.push_back(record);
 }
 
 void Table::handler_record_chu(int value, int seat)
@@ -5781,7 +5883,7 @@ void Table::handler_record_chu(int value, int seat)
     record.seats[1] = MBYTE(0xFF);
     record.action = RECORD_CHU;
     record.holes[0] = MBYTE(value);
-	replay.play_record.push_back(record);
+    replay.play_record.push_back(record);
 }
 
 string Table::format_card_desc(int card_type, int seatid)
@@ -5792,28 +5894,28 @@ string Table::format_card_desc(int card_type, int seatid)
 
     switch (card_type)
     {
-    case CARD_TYPE_PING_HU:// 平胡
+    case CARD_TYPE_PING_HU: // 平胡
         str = "平胡";
         break;
-    case CARD_TYPE_PENG_HU:         // 碰碰胡
+    case CARD_TYPE_PENG_HU: // 碰碰胡
         str = "碰碰胡";
         break;
-	case CARD_TYPE_QI_XIAO_DUI:// 7小对
+    case CARD_TYPE_QI_XIAO_DUI: // 7小对
         str = "七小对";
         break;
-    case CARD_TYPE_LONG_QI_DUI:         //龙七对
+    case CARD_TYPE_LONG_QI_DUI: //龙七对
         str = "龙七对";
         break;
-    case CARD_TYPE_QING_YI_SE:     // 清一色
+    case CARD_TYPE_QING_YI_SE: // 清一色
         str = "清一色";
         break;
-	case CARD_TYPE_QING_PENG:	// 清一色碰碰胡
+    case CARD_TYPE_QING_PENG: // 清一色碰碰胡
         str = "清一色碰碰胡";
         break;
-    case CARD_TYPE_QING_QI_DUI:// 清一色七小对
+    case CARD_TYPE_QING_QI_DUI: // 清一色七小对
         str = "清一色七小对";
         break;
-    case CARD_TYPE_QING_LONG_QI_DUI:// 清龙七对
+    case CARD_TYPE_QING_LONG_QI_DUI: // 清龙七对
         str = "清龙七对";
         break;
     default:
@@ -5850,11 +5952,11 @@ string Table::format_card_desc(int card_type, int seatid)
         {
             str_special = "海底炮, ";
         }
-		
-		if (lian_gang_flag == 1)
-		{
-			str_special = "连杠杠上花, ";
-		}
+
+        if (lian_gang_flag == 1)
+        {
+            str_special = "连杠杠上花, ";
+        }
 
         if (lian_gang_pao_flag == 1)
         {
@@ -5864,160 +5966,159 @@ string Table::format_card_desc(int card_type, int seatid)
 
     if (seatid >= 0 && seatid < seat_max)
     {
-        if (seats[seatid].hole_cards.men_qing_flag
-            && (card_type != CARD_TYPE_PING_HU || (card_type == CARD_TYPE_PING_HU && seats[seatid].hole_cards.cards.size() % 3 == 2)))
+        if (seats[seatid].hole_cards.men_qing_flag && (card_type != CARD_TYPE_PING_HU || (card_type == CARD_TYPE_PING_HU && seats[seatid].hole_cards.cards.size() % 3 == 2)))
         {
             str_special += "门清, ";
-        }      
+        }
     }
-    
+
     desc = str_special + str;
     return desc;
 }
 
 //提前开始的申请处理
-void Table::handler_start_game_req(Player* player)
+void Table::handler_start_game_req(Player *player)
 {
-	Json::Value &val = player->client->packet.tojson();
+    Json::Value &val = player->client->packet.tojson();
 
-	Seat &seat = seats[player->seatid];
-	int flag = val["flag"].asInt();
+    Seat &seat = seats[player->seatid];
+    int flag = val["flag"].asInt();
 
-	if (state != ROOM_WAIT_GAME)
-	{
-		return;
-	}
+    if (state != ROOM_WAIT_GAME)
+    {
+        return;
+    }
 
-	if (players.size() == 1 || static_cast<int>(players.size()) == seat_max)
-	{
-		return;
-	}
+    if (players.size() == 1 || static_cast<int>(players.size()) == seat_max)
+    {
+        return;
+    }
 
-	seat.ahead_start = (flag == 0 ? 0 : 1);
+    seat.ahead_start = (flag == 0 ? 0 : 1);
 
-	if (ahead_start_flag == 0 && flag == 1)
-	{
-		ahead_start_flag = 1;
-		ahead_start_uid = player->uid;
-		seat.ahead_start = flag;
-		if (flag == 1)
-		{
+    if (ahead_start_flag == 0 && flag == 1)
+    {
+        ahead_start_flag = 1;
+        ahead_start_uid = player->uid;
+        seat.ahead_start = flag;
+        if (flag == 1)
+        {
             ev_timer_again(zjh.loop, &ahead_start_timer);
-			broadcast_ahead_start_status(player, 1);			
-		}
-	}
-	else if (ahead_start_flag == 0 && flag == 0)
-	{
-		seat.ahead_start = -1;
-	}
-	else
-	{
-		if (flag == 0)
-		{
-			seat.ahead_start = 0;
+            broadcast_ahead_start_status(player, 1);
+        }
+    }
+    else if (ahead_start_flag == 0 && flag == 0)
+    {
+        seat.ahead_start = -1;
+    }
+    else
+    {
+        if (flag == 0)
+        {
+            seat.ahead_start = 0;
             ev_timer_stop(zjh.loop, &ahead_start_timer);
-			broadcast_ahead_start_status(player, 0);
+            broadcast_ahead_start_status(player, 0);
 
-			ahead_start_flag = 0;
-			ahead_start_uid = -1;
+            ahead_start_flag = 0;
+            ahead_start_uid = -1;
 
-			for (int i = 0; i < seat_max; i++)
-			{
-				seats[i].ahead_start = -1;
-			}		
-		}
-		else
-		{
-			int total = 0;
-			int count = 0;
-			for (int i = 0; i < seat_max; i++)
-			{
-				if (seats[i].player != NULL)
-				{
-					total++;
-					if (seats[i].ahead_start == 1)
-					{
-						count++;
-					}
-				}
-			}
+            for (int i = 0; i < seat_max; i++)
+            {
+                seats[i].ahead_start = -1;
+            }
+        }
+        else
+        {
+            int total = 0;
+            int count = 0;
+            for (int i = 0; i < seat_max; i++)
+            {
+                if (seats[i].player != NULL)
+                {
+                    total++;
+                    if (seats[i].ahead_start == 1)
+                    {
+                        count++;
+                    }
+                }
+            }
 
-			broadcast_ahead_start_status(player, 1);
+            broadcast_ahead_start_status(player, 1);
 
-			if (total == count)
-			{
-				ahead_start_flag = 0;
-				ahead_start_uid = -1;
+            if (total == count)
+            {
+                ahead_start_flag = 0;
+                ahead_start_uid = -1;
 
-				for (int i = 0; i < seat_max; i++)
-				{
-					seats[i].ahead_start = -1;
-				}
+                for (int i = 0; i < seat_max; i++)
+                {
+                    seats[i].ahead_start = -1;
+                }
 
-				ev_timer_stop(zjh.loop, &ahead_start_timer);
-				max_ready_players = std::max(2, total);
+                ev_timer_stop(zjh.loop, &ahead_start_timer);
+                max_ready_players = std::max(2, total);
 
-				test_game_start();
-			}
-		}
-	}
+                test_game_start();
+            }
+        }
+    }
 }
 
-//0：不同意提前开始 1：谁申请开始，同意开始 
-void Table::broadcast_ahead_start_status(Player* player, int flag)
+//0：不同意提前开始 1：谁申请开始，同意开始
+void Table::broadcast_ahead_start_status(Player *player, int flag)
 {
-	Jpacket packet;
-	packet.val["cmd"] = SERVER_START_GAME_REQ_BC;
+    Jpacket packet;
+    packet.val["cmd"] = SERVER_START_GAME_REQ_BC;
 
-	if (player != NULL)
-	{
-		packet.val["name"] = player->name;
-		packet.val["uid"] = player->uid;
-		packet.val["seatid"] = player->seatid;
-	}
+    if (player != NULL)
+    {
+        packet.val["name"] = player->name;
+        packet.val["uid"] = player->uid;
+        packet.val["seatid"] = player->seatid;
+    }
 
-	packet.val["ahead_start_flag"] = ahead_start_flag;
-	packet.val["ahead_start_uid"] = ahead_start_uid;
+    packet.val["ahead_start_flag"] = ahead_start_flag;
+    packet.val["ahead_start_uid"] = ahead_start_uid;
 
-	if (flag == 1)
-	{
-		packet.val["ahead_start_time"] = (int)ev_timer_remaining(zjh.loop, &ahead_start_timer);
-	}
-	else
-	{
-		packet.val["ahead_start_time"] = 0;
-	}
+    if (flag == 1)
+    {
+        packet.val["ahead_start_time"] = (int)ev_timer_remaining(zjh.loop, &ahead_start_timer);
+    }
+    else
+    {
+        packet.val["ahead_start_time"] = 0;
+    }
 
-	int i = 0;
-	std::map<int, Player*>::iterator it;
-	for (it = players.begin(); it != players.end(); it++) {
-		Player *p = it->second;
-		Seat &seat = seats[p->seatid];
+    int i = 0;
+    std::map<int, Player *>::iterator it;
+    for (it = players.begin(); it != players.end(); it++)
+    {
+        Player *p = it->second;
+        Seat &seat = seats[p->seatid];
 
-		packet.val["players"][i]["uid"] = p->uid;
-		packet.val["players"][i]["name"] = p->name;
-		packet.val["players"][i]["seatid"] = p->seatid;
-		packet.val["players"][i]["ahead_start"] = seat.ahead_start;
+        packet.val["players"][i]["uid"] = p->uid;
+        packet.val["players"][i]["name"] = p->name;
+        packet.val["players"][i]["seatid"] = p->seatid;
+        packet.val["players"][i]["ahead_start"] = seat.ahead_start;
 
-		i++;
-	}
+        i++;
+    }
 
-	packet.end();
-	broadcast(NULL, packet.tostring());
-
+    packet.end();
+    broadcast(NULL, packet.tostring());
 }
 
 void Table::ahead_start_timer_cb(struct ev_loop *loop, struct ev_timer *w, int revents)
 {
-	Table *table = (Table*)w->data;
-	ev_timer_stop(zjh.loop, &table->ahead_start_timer);
+    Table *table = (Table *)w->data;
+    ev_timer_stop(zjh.loop, &table->ahead_start_timer);
 
-	table->ahead_start_timeout();
+    table->ahead_start_timeout();
 }
 
 void Table::subs_timer_cb(struct ev_loop *loop, struct ev_timer *w, int revents)
 {
-    Table *table = (Table*) w->data;
+    Table *table = (Table *)w->data;
     ev_timer_stop(zjh.loop, &table->ahead_start_timer);
 
     table->clean_table();
@@ -6026,16 +6127,16 @@ void Table::subs_timer_cb(struct ev_loop *loop, struct ev_timer *w, int revents)
 //提前开始申请时间到了默认是不提前开始
 int Table::ahead_start_timeout()
 {
-	ahead_start_flag = 0;
-	ahead_start_uid = -1;
+    ahead_start_flag = 0;
+    ahead_start_uid = -1;
 
-	for (int i = 0; i < seat_max; i++)
-	{
-		seats[i].ahead_start = -1;
-	}
+    for (int i = 0; i < seat_max; i++)
+    {
+        seats[i].ahead_start = -1;
+    }
 
-	broadcast_ahead_start_status(NULL, 0);
-	return 0;
+    broadcast_ahead_start_status(NULL, 0);
+    return 0;
 }
 
 int Table::handler_transfer_owner_req(Player *player)
@@ -6062,13 +6163,12 @@ int Table::handler_transfer_owner_req(Player *player)
         return -1;
     }
 
-
-	//AA付费没没有转让房主
-	if(cost_select_flag == 2)
-	{
-		handler_transfer_owner_req_error(player, 5);
-		return -1;
-	}
+    //AA付费没没有转让房主
+    if (cost_select_flag == 2)
+    {
+        handler_transfer_owner_req_error(player, 5);
+        return -1;
+    }
 
     if (round_count != 0)
     {
@@ -6076,12 +6176,11 @@ int Table::handler_transfer_owner_req(Player *player)
         return -1;
     }
 
-
     if (!transfer_flag)
     {
-       players[origin_owner_uid]->incr_rmb(0 - create_rmb);
-       Player* player1 = players[origin_owner_uid];
-       insert_flow_log((int)time(NULL), player1->uid, player1->remote_ip, 0, type, zid, ttid, type, 0, create_rmb, player1->rmb);
+        players[origin_owner_uid]->incr_rmb(0 - create_rmb);
+        Player *player1 = players[origin_owner_uid];
+        insert_flow_log((int)time(NULL), player1->uid, player1->remote_ip, 0, type, zid, ttid, type, 0, create_rmb, player1->rmb);
     }
 
     Jpacket packet;
@@ -6096,13 +6195,13 @@ int Table::handler_transfer_owner_req(Player *player)
     zjh.game->table_owners.erase(owner_uid);
     zjh.game->table_owners[transfer_uid] = tid;
 
-    owner_uid = transfer_uid; 
+    owner_uid = transfer_uid;
     transfer_flag = true;
 
     return 0;
 }
 
-void Table::handler_transfer_owner_req_error(Player* player, int reason)
+void Table::handler_transfer_owner_req_error(Player *player, int reason)
 {
     mjlog.error("handler transfer owner error, reason is %d.\n", reason);
     Jpacket packet;
@@ -6115,18 +6214,18 @@ void Table::handler_transfer_owner_req_error(Player* player, int reason)
 int Table::handler_need_card_req(Player *player)
 {
     Json::Value &val = player->client->packet.tojson();
-	Seat & seat = seats[player->seatid];
-	int need_card = val["need_card"].asInt();
+    Seat &seat = seats[player->seatid];
+    int need_card = val["need_card"].asInt();
 
-	if (set_card_flag == 0)
+    if (set_card_flag == 0)
     {
-		mjlog.info("handler need card req error[%d]\n", set_card_flag);
-		return 0;
-	}
+        mjlog.info("handler need card req error[%d]\n", set_card_flag);
+        return 0;
+    }
 
-	seat.need_card = need_card;
+    seat.need_card = need_card;
 
-	return 0;
+    return 0;
 }
 
 void Table::accumulate_hu()
@@ -6163,7 +6262,7 @@ void Table::accumulate_hu()
     else if (pao_hu_seat >= 0)
     {
         seats[pao_hu_seat].total_fang_pao++;
-    }  
+    }
 }
 
 int Table::set_create_rmb(int rmb, int aarmb)
@@ -6172,10 +6271,10 @@ int Table::set_create_rmb(int rmb, int aarmb)
     return 0;
 }
 
-int Table::permit_join(Player* player)
+int Table::permit_join(Player *player)
 {
     float gps_distance = zjh.conf["tables"]["gps_distance"].asFloat();
-    std::map<int, Player*>::iterator it = players.begin();
+    std::map<int, Player *>::iterator it = players.begin();
     for (; it != players.end(); it++)
     {
         if (forbid_same_ip == 1)
@@ -6194,11 +6293,10 @@ int Table::permit_join(Player* player)
 
             player->jin_du = jindu;
             player->wei_du = weidu;
-            
-            Player* player1 = it->second;
 
-            if (jindu > 1.0f && weidu > 1.0f
-                && player1->jin_du > 1.0f && player1->wei_du > 1.0f)
+            Player *player1 = it->second;
+
+            if (jindu > 1.0f && weidu > 1.0f && player1->jin_du > 1.0f && player1->wei_du > 1.0f)
             {
                 if (GetDistance(jindu, weidu, player1->jin_du, player1->wei_du) < gps_distance)
                 {
@@ -6211,78 +6309,75 @@ int Table::permit_join(Player* player)
     return 0;
 }
 
-
-int Table::handler_cmd(int cmd, Player* player)
+int Table::handler_cmd(int cmd, Player *player)
 {
-	switch (cmd)
-	{
-		case CLIENT_READY_REQ:
-			handler_ready(player);
-			break;
-		case CLIENT_BET_REQ:
-			handler_bet(player);
-			break;
-		case CLIENT_CHAT_REQ:
-			handler_chat(player);
-			break;
-		case CLIENT_FACE_REQ:
-			handler_face(player);
-			break;
-		case CLIENT_INTERFACE_REQ:
-			handler_interFace(player);
-			break;
-		case CLIENT_LOGOUT_REQ:
-			break;
-		case CLIENT_SWITCH_TABLE_REQ:
-			break;
-		case CLIENT_TABLE_INFO_REQ:
-			handler_table_info(player);
-			break;
-		case CLIENT_PLAYER_INFO_REQ:
-			handler_player_info(player);
-			break;
-		case CLIENT_PROP_REQ:
-			handler_prop(player);
-			break;
-		case CLIENT_SEND_GIFT_REQ:
-			handler_send_gift_req(player);
-			break;
-		case CLIENT_DISMISS_TABLE_REQ:
-			handler_dismiss_table(player);
-			break;
-		case CLIENT_GPS_POS_NOTICE:
-			handler_gps_notice(player);
-			break;
-		case CLIENT_GPS_DIS_REQ:
-			handler_gps_dist_req(player);
-			break;
-		case CLIENT_VOICE_REQ:
-			handler_voice_req(player);
-			break;
-		case CLIENT_START_GAME_REQ:
-			handler_start_game_req(player);
-			break;
-		case CLIENT_NEED_CARD_REQ:
-			handler_need_card_req(player);
-			break;
-		case CLIENT_TRANSFER_OWNER_REQ:
-			handler_transfer_owner_req(player);
-			break;
-		case CLIENT_GET_REDPACKET_REQ:
-			handler_get_redpacket_req(player);
-			break;
-		case CLIENT_GET_INTERNET_REQ:
-			handler_get_internet_req(player);
-			break;
-		default:
-			mjlog.error("invalid command[%d]\n", cmd);
-			return -1;
-	}
+    switch (cmd)
+    {
+    case CLIENT_READY_REQ:
+        handler_ready(player);
+        break;
+    case CLIENT_BET_REQ:
+        handler_bet(player);
+        break;
+    case CLIENT_CHAT_REQ:
+        handler_chat(player);
+        break;
+    case CLIENT_FACE_REQ:
+        handler_face(player);
+        break;
+    case CLIENT_INTERFACE_REQ:
+        handler_interFace(player);
+        break;
+    case CLIENT_LOGOUT_REQ:
+        break;
+    case CLIENT_SWITCH_TABLE_REQ:
+        break;
+    case CLIENT_TABLE_INFO_REQ:
+        handler_table_info(player);
+        break;
+    case CLIENT_PLAYER_INFO_REQ:
+        handler_player_info(player);
+        break;
+    case CLIENT_PROP_REQ:
+        handler_prop(player);
+        break;
+    case CLIENT_SEND_GIFT_REQ:
+        handler_send_gift_req(player);
+        break;
+    case CLIENT_DISMISS_TABLE_REQ:
+        handler_dismiss_table(player);
+        break;
+    case CLIENT_GPS_POS_NOTICE:
+        handler_gps_notice(player);
+        break;
+    case CLIENT_GPS_DIS_REQ:
+        handler_gps_dist_req(player);
+        break;
+    case CLIENT_VOICE_REQ:
+        handler_voice_req(player);
+        break;
+    case CLIENT_START_GAME_REQ:
+        handler_start_game_req(player);
+        break;
+    case CLIENT_NEED_CARD_REQ:
+        handler_need_card_req(player);
+        break;
+    case CLIENT_TRANSFER_OWNER_REQ:
+        handler_transfer_owner_req(player);
+        break;
+    case CLIENT_GET_REDPACKET_REQ:
+        handler_get_redpacket_req(player);
+        break;
+    case CLIENT_GET_INTERNET_REQ:
+        handler_get_internet_req(player);
+        break;
+    default:
+        mjlog.error("invalid command[%d]\n", cmd);
+        return -1;
+    }
 
-	return 0;
+    return 0;
 }
-
-
 
 int Table::handler_redpacket()
 {
@@ -6302,210 +6397,211 @@ int Table::handler_redpacket()
 
     long btime = zjh.temp_rc->get_value_as_int("btime");
     long etime = zjh.temp_rc->get_value_as_int("etime");
-	std::string citys = zjh.temp_rc->get_value_as_string("area");
-	long now = time(NULL);
+    std::string citys = zjh.temp_rc->get_value_as_string("area");
+    long now = time(NULL);
 
-	mjlog.debug("handler_redpacket btime [%ld] etime[%ld] citys[%s] now[%ld]\n", 
-			btime, etime, citys.c_str(), now);
+    mjlog.debug("handler_redpacket btime [%ld] etime[%ld] citys[%s] now[%ld]\n",
+                btime, etime, citys.c_str(), now);
 
-	std::string all_city = "*";
+    std::string all_city = "*";
 
-	if (now < btime || now > etime)
-	{
-		mjlog.debug("no redpacket task 2.\n");
-		return -1;
-	}
+    if (now < btime || now > etime)
+    {
+        mjlog.debug("no redpacket task 2.\n");
+        return -1;
+    }
 
-	// 获取一个红包值
-	ret = zjh.temp_rc->command("rpop red_list");
+    // 获取一个红包值
+    ret = zjh.temp_rc->command("rpop red_list");
 
-	if (ret >= 0 && max_ready_players == seat_max )
-	{
-		if (zjh.temp_rc->reply->str == NULL)
-		{
-			mjlog.debug("cann't get a redpacket 3.\n");
-			return 0;
-			
-		}
-	
-		std::vector<int> tmp;
-		for (int i = 0; i < seat_max; i++)
-		{
-			if (seats[i].ready != 1 || seats[i].player == NULL)
-			{
-				continue;
-			}
-			mjlog.debug("handler_redpacket btime [%ld] etime[%ld] citys[%s] now[%ld] player->city[%s]\n", 
-					btime, etime, citys.c_str(), now, seats[i].player->city.c_str());
-			if (citys != all_city)
-			{
-				std::size_t found  = citys.find(seats[i].player->city);
-				if (found != std::string::npos)
-				{
-					tmp.push_back(i);
-					seats[i].city_red_falg = 1;
-				}
-			}
-			else 
-			{
-				tmp.push_back(i);
-				seats[i].city_red_falg = 1;
-			}
-		}
-		if(tmp.size() > 0)
-		{
-			if (red_type == 0)
-			{
-				// 预先分配好红包
-				random_shuffle(tmp.begin(), tmp.end());
-				int len = tmp.size();
-				int red_seatid = 0;
-				if (len > 0)
-				{
-					int index = random(0, len - 1);	
-					red_seatid = tmp[index];
-				}
-				int red_values[4] = {0, };
-				red_values[red_seatid] = atoi(zjh.temp_rc->reply->str);	
-				//random_shuffle(red_value, red_value + 4);
-				redpackes.clear();
-				for(int i = 0; i < 4; i++)
-				{
-					redpackes.push_back(red_values[i]);
-				}
-				//redpackes.assign(red_value, red_value + 4);
-				mjlog.debug("red_seatid [%d] red_values[red_seatid] [%d] redpackes.size() [%d] \n", 
-						red_seatid ,red_values[red_seatid], redpackes.size()); 
-			}
-			else if(red_type == 1) 
-			{
-				redpackes.clear();
-				for(int i = 0; i < (seat_max -1 ); i++)
-				{
-					redpackes.push_back(0);
-				}
-				int red_values = atoi(zjh.temp_rc->reply->str);
-				redpackes.push_back(red_values);
-			}
-			mjlog.debug("handler_redpacket redpackes.size() [%d]\n", redpackes.size());
-			Jpacket packet;
-			packet.val["cmd"] = SERVER_DISPATCH_REDPACKET_SUCC_BC;
-			packet.end();      
-			broadcast(NULL, packet.tostring());
-		}
-	}
-	else
-	{
-		mjlog.debug("cann't get a redpacket.\n");
-	}
+    if (ret >= 0 && max_ready_players == seat_max)
+    {
+        if (zjh.temp_rc->reply->str == NULL)
+        {
+            mjlog.debug("cann't get a redpacket 3.\n");
+            return 0;
+        }
 
-	return 0;
+        std::vector<int> tmp;
+        for (int i = 0; i < seat_max; i++)
+        {
+            if (seats[i].ready != 1 || seats[i].player == NULL)
+            {
+                continue;
+            }
+            mjlog.debug("handler_redpacket btime [%ld] etime[%ld] citys[%s] now[%ld] player->city[%s]\n",
+                        btime, etime, citys.c_str(), now, seats[i].player->city.c_str());
+            if (citys != all_city)
+            {
+                std::size_t found = citys.find(seats[i].player->city);
+                if (found != std::string::npos)
+                {
+                    tmp.push_back(i);
+                    seats[i].city_red_falg = 1;
+                }
+            }
+            else
+            {
+                tmp.push_back(i);
+                seats[i].city_red_falg = 1;
+            }
+        }
+        if (tmp.size() > 0)
+        {
+            if (red_type == 0)
+            {
+                // 预先分配好红包
+                random_shuffle(tmp.begin(), tmp.end());
+                int len = tmp.size();
+                int red_seatid = 0;
+                if (len > 0)
+                {
+                    int index = random(0, len - 1);
+                    red_seatid = tmp[index];
+                }
+                int red_values[4] = {
+                    0,
+                };
+                red_values[red_seatid] = atoi(zjh.temp_rc->reply->str);
+                //random_shuffle(red_value, red_value + 4);
+                redpackes.clear();
+                for (int i = 0; i < 4; i++)
+                {
+                    redpackes.push_back(red_values[i]);
+                }
+                //redpackes.assign(red_value, red_value + 4);
+                mjlog.debug("red_seatid [%d] red_values[red_seatid] [%d] redpackes.size() [%d] \n",
+                            red_seatid, red_values[red_seatid], redpackes.size());
+            }
+            else if (red_type == 1)
+            {
+                redpackes.clear();
+                for (int i = 0; i < (seat_max - 1); i++)
+                {
+                    redpackes.push_back(0);
+                }
+                int red_values = atoi(zjh.temp_rc->reply->str);
+                redpackes.push_back(red_values);
+            }
+            mjlog.debug("handler_redpacket redpackes.size() [%d]\n", redpackes.size());
+            Jpacket packet;
+            packet.val["cmd"] = SERVER_DISPATCH_REDPACKET_SUCC_BC;
+            packet.end();
+            broadcast(NULL, packet.tostring());
+        }
+    }
+    else
+    {
+        mjlog.debug("cann't get a redpacket.\n");
+    }
+
+    return 0;
 }
 
 int Table::record_redpacket(Player *player, int value)
 {
-	Jpacket packet;
-	packet.val["tid"] = ttid;
-	packet.val["uid"] = player->uid;
-	packet.val["money"] = value;
-	packet.val["time"] = (int)time(NULL);
-	packet.end();
+    Jpacket packet;
+    packet.val["tid"] = ttid;
+    packet.val["uid"] = player->uid;
+    packet.val["money"] = value;
+    packet.val["time"] = (int)time(NULL);
+    packet.end();
 
-	string str = packet.val.toStyledString().c_str();
+    string str = packet.val.toStyledString().c_str();
 
-	int ret = zjh.temp_rc->command("LPUSH red_record_list %s", str.c_str());
+    int ret = zjh.temp_rc->command("LPUSH red_record_list %s", str.c_str());
 
-	if (ret < 0)
-	{
-		mjlog.error("insert_flow_record %s", str.c_str());
-		return - 1;
-	}
+    if (ret < 0)
+    {
+        mjlog.error("insert_flow_record %s", str.c_str());
+        return -1;
+    }
 
-	player->incr_total_red(value);
-	return 0;
+    player->incr_total_red(value);
+    return 0;
 }
 
 int Table::handler_get_redpacket_req(Player *player)
 {
-	if (redpackes.size() == 0)
-	{
-		Jpacket packet;
-		packet.val["cmd"] = SERVER_GET_REDPACKET_ERR_UC;
-		packet.val["err_str"] = "红包不存在。";
-		packet.end();
-		unicast(player, packet.tostring());
-		return 0;
-	}
+    if (redpackes.size() == 0)
+    {
+        Jpacket packet;
+        packet.val["cmd"] = SERVER_GET_REDPACKET_ERR_UC;
+        packet.val["err_str"] = "红包不存在。";
+        packet.end();
+        unicast(player, packet.tostring());
+        return 0;
+    }
 
-	Seat & seat = seats[player->seatid];
-	if(seat.already_get_red == 1)
-	{
-		Jpacket packet;
-		packet.val["cmd"] = SERVER_GET_REDPACKET_ERR_UC;
-		packet.val["err_str"] = "您的红包已经领取过了。";
-		packet.end();
-		unicast(player, packet.tostring());
-		return 0;
-	}
+    Seat &seat = seats[player->seatid];
+    if (seat.already_get_red == 1)
+    {
+        Jpacket packet;
+        packet.val["cmd"] = SERVER_GET_REDPACKET_ERR_UC;
+        packet.val["err_str"] = "您的红包已经领取过了。";
+        packet.end();
+        unicast(player, packet.tostring());
+        return 0;
+    }
 
-	if (seat.city_red_falg != 1)
-	{
-		seat.already_get_red = 1;
-		Jpacket packet;
-		packet.val["cmd"] = SERVER_GET_REDPACKET_ERR_UC;
-		packet.val["err_str"] = "您不在活动所在区域，不能参与活动。";
-		packet.end();
-		unicast(player, packet.tostring());
-		return 0;
-	}
+    if (seat.city_red_falg != 1)
+    {
+        seat.already_get_red = 1;
+        Jpacket packet;
+        packet.val["cmd"] = SERVER_GET_REDPACKET_ERR_UC;
+        packet.val["err_str"] = "您不在活动所在区域，不能参与活动。";
+        packet.end();
+        unicast(player, packet.tostring());
+        return 0;
+    }
 
-	//Json::Value &val = player->client->packet.tojson();
-	int value = 0;
-	if(red_type == 0)
-	{
-		value = redpackes[player->seatid];
-	}
-	else if (red_type == 1)
-	{
-		if(redpackes.size() > 0 && seat.city_red_falg == 1)
-		{
-			value = redpackes.back();
-			redpackes.pop_back();
-		}
-	}
-	seat.already_get_red = 1;
+    //Json::Value &val = player->client->packet.tojson();
+    int value = 0;
+    if (red_type == 0)
+    {
+        value = redpackes[player->seatid];
+    }
+    else if (red_type == 1)
+    {
+        if (redpackes.size() > 0 && seat.city_red_falg == 1)
+        {
+            value = redpackes.back();
+            redpackes.pop_back();
+        }
+    }
+    seat.already_get_red = 1;
 
-	Jpacket packet;
-	packet.val["cmd"] = SERVER_GET_REDPACKET_SUCC_UC;	
-	packet.val["value"] = value;
-	packet.end();
-	unicast(player, packet.tostring());
+    Jpacket packet;
+    packet.val["cmd"] = SERVER_GET_REDPACKET_SUCC_UC;
+    packet.val["value"] = value;
+    packet.end();
+    unicast(player, packet.tostring());
 
-	if (value > 0)
-	{
-		Jpacket packet1;
-		packet1.val["cmd"] = SERVER_GET_REDPACKET_SUCC_BC;
-		packet1.val["value"] = value;
-		packet1.val["uid"] = player->uid;
-		packet1.val["name"] = player->name;
-		packet1.end();
-		broadcast(NULL, packet1.tostring());
+    if (value > 0)
+    {
+        Jpacket packet1;
+        packet1.val["cmd"] = SERVER_GET_REDPACKET_SUCC_BC;
+        packet1.val["value"] = value;
+        packet1.val["uid"] = player->uid;
+        packet1.val["name"] = player->name;
+        packet1.end();
+        broadcast(NULL, packet1.tostring());
 
-		record_redpacket(player, value);
-	}
+        record_redpacket(player, value);
+    }
 
-	return 0;
+    return 0;
 }
 
 int Table::handler_invite_advantage(Player *player)
 {
-	if(player->pre_uid < 1000)
-	{
-		mjlog.debug("handler_invite_advantage player total_board[%d] pre_uid[%d]\n", player->total_board,  player->pre_uid);
-		return -1;
-	}
+    if (player->pre_uid < 1000)
+    {
+        mjlog.debug("handler_invite_advantage player total_board[%d] pre_uid[%d]\n", player->total_board, player->pre_uid);
+        return -1;
+    }
 
-	int ret = zjh.temp_rc->command("hgetall bac");
+    int ret = zjh.temp_rc->command("hgetall bac");
     if (ret < 0)
     {
         mjlog.debug("no invite advantage task.\n");
@@ -6520,89 +6616,90 @@ int Table::handler_invite_advantage(Player *player)
 
     long btime = zjh.temp_rc->get_value_as_int("btime");
     long etime = zjh.temp_rc->get_value_as_int("etime");
-	std::string citys = zjh.temp_rc->get_value_as_string("area");
-	std::string all_city = "*";
-	long now = time(NULL);
+    std::string citys = zjh.temp_rc->get_value_as_string("area");
+    std::string all_city = "*";
+    long now = time(NULL);
 
-	mjlog.debug("handler_invite_advantage btime [%ld] etime[%ld] citys[%s] now[%ld] player->city[%s]\n", 
-					btime, etime, citys.c_str(), now, player->city.c_str());
+    mjlog.debug("handler_invite_advantage btime [%ld] etime[%ld] citys[%s] now[%ld] player->city[%s]\n",
+                btime, etime, citys.c_str(), now, player->city.c_str());
 
-	if (now < btime || now > etime)
-	{
-		mjlog.debug("handler_redpacket not at right time now [%d] btime[%d] etime[%d].\n", now, btime, etime);
-		return -1;
-	}
-	
-	if(citys != all_city) 
-	{
-		std::size_t found  = citys.find(player->city);
-		if (found == std::string::npos)
-		{
-			mjlog.debug("handler_redpacket not at activity city citys[%s] player->city[%s].\n", citys.c_str(), player->city.c_str());
-			return -1;
-		}
-	}
+    if (now < btime || now > etime)
+    {
+        mjlog.debug("handler_redpacket not at right time now [%d] btime[%d] etime[%d].\n", now, btime, etime);
+        return -1;
+    }
 
-	
-	player->incr_ac_board(vid, 1);
+    if (citys != all_city)
+    {
+        std::size_t found = citys.find(player->city);
+        if (found == std::string::npos)
+        {
+            mjlog.debug("handler_redpacket not at activity city citys[%s] player->city[%s].\n", citys.c_str(), player->city.c_str());
+            return -1;
+        }
+    }
 
-	mjlog.debug("handler_invite_advantage player uid[%d] ac_board[%d] pre_uid[%d]\n", 
-				player->uid, player->ac_board,  player->pre_uid);
+    player->incr_ac_board(vid, 1);
 
-	if(player->ac_board != 8)
-	{	
-		return -1;
-	}
-	
-	ret = zjh.temp_rc->command("sadd tj_uid %d", player->uid);
-	if(ret < 0)
-	{
-		mjlog.debug("handler_invite_advantage sadd tj_uid %d\n", player->uid);
-		return -1;
-	}
-	return 0;
+    mjlog.debug("handler_invite_advantage player uid[%d] ac_board[%d] pre_uid[%d]\n",
+                player->uid, player->ac_board, player->pre_uid);
+
+    if (player->ac_board != 8)
+    {
+        return -1;
+    }
+
+    ret = zjh.temp_rc->command("sadd tj_uid %d", player->uid);
+    if (ret < 0)
+    {
+        mjlog.debug("handler_invite_advantage sadd tj_uid %d\n", player->uid);
+        return -1;
+    }
+    return 0;
 }
 
-void Table::handler_substitute_req(Player* player)
+void Table::handler_substitute_req(Player *player)
 {
     //int create_rmb = zjh.conf["tables"]["create_rmb"].asInt();
-	Json::Value &val = player->client->packet.tojson();
-	std::string describe = val["describe"].asString();
-   // int base_play_board = zjh.conf["tables"]["base_board"].asInt();
+    Json::Value &val = player->client->packet.tojson();
+    std::string describe = val["describe"].asString();
+    // int base_play_board = zjh.conf["tables"]["base_board"].asInt();
 
     player->tid = -1;
 
     Jpacket packet;
-	packet.val["cmd"] = SERVER_SUBSTITUTE_SUCC_UC;
-	packet.val["uid"] = player->uid;
+    packet.val["cmd"] = SERVER_SUBSTITUTE_SUCC_UC;
+    packet.val["uid"] = player->uid;
     packet.val["ttid"] = ttid;
-    packet.val["rmb"] = create_rmb ;
-	packet.end();
-	unicast(player, packet.tostring());
+    packet.val["rmb"] = create_rmb;
+    packet.end();
+    unicast(player, packet.tostring());
     owner_uid = player->uid;
     owner_name = player->name;
 
-    player->incr_rmb(0 - create_rmb );
+    player->incr_rmb(0 - create_rmb);
 
-    char buff[128] = {0, };
+    char buff[128] = {
+        0,
+    };
 
     snprintf(buff, 128, "南宁麻将，%d局，%d匹马", max_play_board, horse_num);
     if (fang_pao == 1)
     {
-        snprintf(buff+strlen(buff), 128-strlen(buff), "%s", "平胡可点炮");
+        snprintf(buff + strlen(buff), 128 - strlen(buff), "%s", "平胡可点炮");
     }
     else
     {
-        snprintf(buff+strlen(buff), 128-strlen(buff), "%s", "平胡需自摸");
+        snprintf(buff + strlen(buff), 128 - strlen(buff), "%s", "平胡需自摸");
     }
 
     if (dead_double == 1)
     {
-        snprintf(buff+strlen(buff), 128-strlen(buff), "%s", "死双");
+        snprintf(buff + strlen(buff), 128 - strlen(buff), "%s", "死双");
     }
 
     int ret = zjh.temp_rc->command("hmset create:%d:%d uid %d, tid %d, type %d, size 0, status 0, ts %d, ruler %s",
-                                   player->uid, ttid, player->uid, ttid, type, (int)time(NULL),	describe.c_str());
+                                   player->uid, ttid, player->uid, ttid, type, (int)time(NULL), describe.c_str());
 
     owner_uid = player->uid;
     owner_name = player->name;
@@ -6621,7 +6718,7 @@ void Table::handler_substitute_req(Player* player)
     }
 }
 
-void Table::modify_substitute_info(Player* player, int flag)
+void Table::modify_substitute_info(Player *player, int flag)
 {
     int ret = zjh.temp_rc->command("hget create:%d:%d size", owner_uid, ttid);
     if (ret < 0)
@@ -6692,7 +6789,7 @@ void Table::modify_substitute_info(Player* player, int flag)
         if (ret < 0)
         {
             mjlog.error("set substitute info error");
-        }    
+        }
     }
 }
 
@@ -6721,93 +6818,91 @@ void Table::clear_substitute_info()
     }
 }
 
-void Table::create_table_cost()			//创建房间扣费函数
+void Table::create_table_cost() //创建房间扣费函数
 {
     int base_play_board = zjh.conf["tables"]["base_board"].asInt();
-    base_play_board = base_play_board <= 0 ? 8 : base_play_board;   
+    base_play_board = base_play_board <= 0 ? 8 : base_play_board;
     int ratio = max_play_board / base_play_board;
     ratio = std::max(1, ratio);
 
-	if(cost_select_flag == 1)				//房主扣费
-	{
-		mjlog.debug("create_table_cost cost_select_flag [%d] uid[%d] create_rmb[%d]\n", 
-				cost_select_flag, owner_uid, create_rmb);
-		players[owner_uid]->incr_rmb(0 - create_rmb);
-		Player* player = players[owner_uid];
-		insert_flow_log((int)time(NULL), player->uid, player->remote_ip, 0, type, zid, ttid, type, 0, create_rmb, player->rmb);
-	}
-	else if (cost_select_flag == 2)		//AA扣费
-	{
-		for (int i = 0; i < seat_max; i++)
-		{
-			if (seats[i].player != NULL)
-			{
-				mjlog.debug("create_table_cost cost_select_flag [%d] uid[%d] create_rmb[%d]\n", 
-						cost_select_flag, seats[i].player->uid, create_rmb);
-				seats[i].player->incr_rmb(0 - create_rmb);
-				insert_flow_log((int) time(NULL), seats[i].player->uid, seats[i].player->remote_ip, 0, type, zid, ttid, type, 0, create_rmb, seats[i].player->rmb);
-			}
-
-		}
-
-	}
+    if (cost_select_flag == 1) //房主扣费
+    {
+        mjlog.debug("create_table_cost cost_select_flag [%d] uid[%d] create_rmb[%d]\n",
+                    cost_select_flag, owner_uid, create_rmb);
+        players[owner_uid]->incr_rmb(0 - create_rmb);
+        Player *player = players[owner_uid];
+        insert_flow_log((int)time(NULL), player->uid, player->remote_ip, 0, type, zid, ttid, type, 0, create_rmb, player->rmb);
+    }
+    else if (cost_select_flag == 2) //AA扣费
+    {
+        for (int i = 0; i < seat_max; i++)
+        {
+            if (seats[i].player != NULL)
+            {
+                mjlog.debug("create_table_cost cost_select_flag [%d] uid[%d] create_rmb[%d]\n",
+                            cost_select_flag, seats[i].player->uid, create_rmb);
+                seats[i].player->incr_rmb(0 - create_rmb);
+                insert_flow_log((int)time(NULL), seats[i].player->uid, seats[i].player->remote_ip, 0, type, zid, ttid, type, 0, create_rmb, seats[i].player->rmb);
+            }
+        }
+    }
 }
 
 int Table::random_dealer()
 {
-	std::vector<int> tmp;
-	for (int i = 0; i < seat_max; i++)
-	{
-		if (seats[i].ready == 1)
-		{
-			tmp.push_back(i);
-		}
-	}
+    std::vector<int> tmp;
+    for (int i = 0; i < seat_max; i++)
+    {
+        if (seats[i].ready == 1)
+        {
+            tmp.push_back(i);
+        }
+    }
 
-	int len = tmp.size();
-	if (len > 0)
-	{
-		int index = random(0, len - 1);
-		int i = tmp[index];
-		mjlog.debug("len[%d] index[%d] i[%d]\n", len, index, i);
-		return i;
-	}
+    int len = tmp.size();
+    if (len > 0)
+    {
+        int index = random(0, len - 1);
+        int i = tmp[index];
+        mjlog.debug("len[%d] index[%d] i[%d]\n", len, index, i);
+        return i;
+    }
 
-	return -1;
+    return -1;
 }
 
 int Table::handler_owner_dismiss_table()
 {
-	if(substitute == 1)
-	{
-		Jpacket packet;
-		packet.val["cmd"] = SERVER_DISMISS_TABLE_SUCC_BC;
-		packet.val["uid"] = owner_uid;
-		packet.val["name"] = owner_name;
-		packet.val["flag"] = 0;
-		packet.end();
-		broadcast(NULL, packet.tostring());
-	}
-	return 0;
+    if (substitute == 1)
+    {
+        Jpacket packet;
+        packet.val["cmd"] = SERVER_DISMISS_TABLE_SUCC_BC;
+        packet.val["uid"] = owner_uid;
+        packet.val["name"] = owner_name;
+        packet.val["flag"] = 0;
+        packet.end();
+        broadcast(NULL, packet.tostring());
+    }
+    return 0;
 }
 
-int Table::handler_get_internet_req(Player * player)
-{  
-   Json::Value &val = player->client->packet.tojson();
-   Jpacket packet;
-   packet.val["cmd"] = SERVER_GET_INTERNET_UC;
-   packet.val["uid"] = player->uid;
-   packet.val["massage"] = val["massage"];
-   packet.end();
-   unicast(player, packet.tostring());
-   return 0;
+int Table::handler_get_internet_req(Player *player)
+{
+    Json::Value &val = player->client->packet.tojson();
+    Jpacket packet;
+    packet.val["cmd"] = SERVER_GET_INTERNET_UC;
+    packet.val["uid"] = player->uid;
+    packet.val["massage"] = val["massage"];
+    packet.end();
+    unicast(player, packet.tostring());
+    return 0;
 }
 
 void Table::huang_zhuang_cha_jiao()
 {
-    if ( !(win_seatid < 0 && gang_hu_count < 2 && pao_hu_count < 2))
+    if (!(win_seatid < 0 && gang_hu_count < 2 && pao_hu_count < 2))
     { //如果没有黄庄，则不进行查叫判断
-        return ;
+        return;
     }
 
     for (int i = 0; i < seat_max; i++)
@@ -6831,28 +6926,33 @@ void Table::huang_zhuang_cha_jiao()
 
             for (unsigned int j = 0; j < seats[i].hole_cards.hu_cards.size(); j++)
             {
-                int score = calculate_base_score(i , 1, seats[i].hole_cards.hu_cards[j].value);
-                if (seats[i].jiao_pai_max_score < score )
+                int score = calculate_base_score(i, 1, seats[i].hole_cards.hu_cards[j].value);
+                if (seats[i].jiao_pai_max_score < score)
                 {
                     seats[i].jiao_pai_max_score = score;
                     seats[i].jiao_pai_max_type = seats[i].hole_cards.card_type;
                 }
             }
+            seats[i].hu_pai_lei_xing = "叫牌";
             seats[i].hole_cards.card_type = seats[i].jiao_pai_max_type;
             seats[i].card_type = seats[i].jiao_pai_max_type;
-            mjlog.debug("huangzhuangchajia seats[%d] max_type[%d] max_score[%d]\n", i, 
-                    seats[i].jiao_pai_max_type, seats[i].jiao_pai_max_score);
+            mjlog.debug("huangzhuangchajia seats[%d] max_type[%d] max_score[%d]\n", i,
+                        seats[i].jiao_pai_max_type, seats[i].jiao_pai_max_score);
             //没有听牌的玩家，给这个玩家相应的分値
             for (int j = 0; j < seat_max; j++)
             {
-                if (seats[j].hole_cards.ting_cards.size() == 0)//没有听牌玩家
-                { 
+                if (seats[j].ready != 1)
+                {
+                    continue;
+                }
+                if (seats[j].hole_cards.ting_cards.size() == 0) //没有听牌玩家
+                {
                     seats[i].score = seats[i].jiao_pai_max_score;
                     seats[i].bet += seats[i].jiao_pai_max_score;
                     seats[i].score_from_players_detail[j][JIAO_PAI_TYPE] += seats[i].jiao_pai_max_score;
                     score_from_players_item_count[i][JIAO_PAI_TYPE]++;
                     score_to_players_item_count[j][JIAO_PAI_TYPE]++;
-                    mjlog.debug("HUAN ZHUANG CHA JIAO seatsid[%d] win %d seatsid[%d] lose\n", i, seats[i].jiao_pai_max_score , j);
+                    mjlog.debug("HUAN ZHUANG CHA JIAO seatsid[%d] win %d seatsid[%d] lose\n", i, seats[i].jiao_pai_max_score, j);
                     seats[j].bet -= seats[i].jiao_pai_max_score;
 
                     score_from_players_item_total[i][JIAO_PAI_TYPE] += seats[i].jiao_pai_max_score;
@@ -6871,18 +6971,17 @@ void Table::huang_zhuang_cha_jiao()
         {
             continue;
         }
-        mjlog.debug("score item jiao_pai_type# from[%d] cnt[%d] to[%d] cnt[%d] \n",score_from_players_item_total[i][JIAO_PAI_TYPE] , score_from_players_item_count[i][JIAO_PAI_TYPE],
-                score_to_players_item_total[i][JIAO_PAI_TYPE], score_to_players_item_count[i][JIAO_PAI_TYPE]);
+        mjlog.debug("score item jiao_pai_type# from[%d] cnt[%d] to[%d] cnt[%d] \n", score_from_players_item_total[i][JIAO_PAI_TYPE], score_from_players_item_count[i][JIAO_PAI_TYPE],
+                    score_to_players_item_total[i][JIAO_PAI_TYPE], score_to_players_item_count[i][JIAO_PAI_TYPE]);
     }
-       
-    return ;
+
+    return;
 }
 
-
 int Table::next_player_seatid_of(int cur_player)
-{//计算cur_player的下一个玩家
+{ //计算cur_player的下一个玩家
     int next_palyer;
-    for (int i=1; i<seat_max; ++i)
+    for (int i = 1; i < seat_max; ++i)
     {
         next_palyer = (cur_player + i) % seat_max;
         if (seats[next_palyer].ready != 1)
@@ -6893,9 +6992,9 @@ int Table::next_player_seatid_of(int cur_player)
 }
 
 int Table::pre_player_seatid_of(int cur_player)
-{//计算cur_player的上一个玩家
+{ //计算cur_player的上一个玩家
     int pre_palyer;
-    for (int i=1; i<seat_max; ++i)
+    for (int i = 1; i < seat_max; ++i)
     {
         pre_palyer = (cur_player - i + seat_max) % seat_max;
         if (seats[pre_palyer].ready != 1)

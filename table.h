@@ -452,7 +452,7 @@ public:
     int                         has_ze_ren_ji; //是否有责任鸡
     int                         has_wu_gu_ze_ren_ji; //是否有责任鸡
     int                         horse_count;
-    //std::map<int, int>          score_from_players_total; //每个玩家的最终得分。
+    std::map<int, int>          score_from_players_total; //每个玩家的最终得分。
     std::map<int, std::map<int, int> > score_from_players_item_total; //每个玩家的每项羸得分。
     std::map<int, std::map<int, int> > score_from_players_item_count; //每个玩家的某种类型牌分次数。
 
