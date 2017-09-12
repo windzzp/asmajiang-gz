@@ -3161,7 +3161,7 @@ int Table::handler_peng(Player *player)
 
     Jpacket packet;
     Jpacket packet1;
-    if (seats[chu_seat].has_chong_feng_ji == 1 && seats[chu_seat].has_ze_ren_ji == 2)
+    if (card == 1 && seats[chu_seat].has_chong_feng_ji == 1 && seats[chu_seat].has_ze_ren_ji == 2)
     {
         seats[chu_seat].has_ze_ren_ji = 1;
         has_ze_ren_ji = 1;
@@ -3172,7 +3172,7 @@ int Table::handler_peng(Player *player)
     }
     if (wu_gu_ji == 1)
     {
-        if (seats[chu_seat].has_chong_feng_wu_gu_ji == 1 && seats[chu_seat].has_wu_gu_ze_ren_ji == 2)
+        if (card == 2 * 16 + 8 && seats[chu_seat].has_chong_feng_wu_gu_ji == 1 && seats[chu_seat].has_wu_gu_ze_ren_ji == 2)
         {
             seats[chu_seat].has_wu_gu_ze_ren_ji = 1;
             has_wu_gu_ze_ren_ji = 1;
@@ -3349,7 +3349,7 @@ int Table::handler_gang(Player *player)
             seat.peng_record[chu_seat] += 1;
         }
 
-        if (seats[chu_seat].has_chong_feng_ji == 1 && seats[chu_seat].has_ze_ren_ji == 2)
+        if ( card == 1 && seats[chu_seat].has_chong_feng_ji == 1 && seats[chu_seat].has_ze_ren_ji == 2)
         {
             seats[chu_seat].has_ze_ren_ji = 1;
             has_ze_ren_ji = 1;
@@ -3360,7 +3360,7 @@ int Table::handler_gang(Player *player)
         }
         if (wu_gu_ji == 1)
         {
-            if (seats[chu_seat].has_chong_feng_wu_gu_ji == 1 && seats[chu_seat].has_wu_gu_ze_ren_ji == 2)
+            if ( card == 2*16 + 8 && seats[chu_seat].has_chong_feng_wu_gu_ji == 1 && seats[chu_seat].has_wu_gu_ze_ren_ji == 2)
             {
                 seats[chu_seat].has_wu_gu_ze_ren_ji = 1;
                 has_wu_gu_ze_ren_ji = 1;
