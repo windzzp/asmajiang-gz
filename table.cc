@@ -1280,7 +1280,10 @@ int Table::start_next_bet(int flag)
         {
             if (find(seat.guo_hu_cards.begin(), seat.guo_hu_cards.end(), last_card.value) == seat.guo_hu_cards.end())
             {
-                if (seat.gang_count[1] == 0 &&                        //没有转弯豆（碰杠）是不能胡牌
+                seat.hole_cards.analysis_card_type(last_card.value);
+                if (seat.is_bao_ting == 0 && seats[chu_seat].is_bao_ting == 0 &&
+                    seat.hole_cards.card_type == CARD_TYPE_PING_HU &&
+                    seat.gang_count[1] == 0 &&                        //没有转弯豆（碰杠）是不能胡牌
                     seats[chu_seat].last_actions[1] != PLAYER_GANG && //如果被胡玩家之前的操作是杠,则杠之后出的牌是可以不用碰杠也可以胡
                     seats[chu_seat].last_actions[0] != PLAYER_GANG    //如果被胡玩家的当前操作是碰杠，则这个杠可以被抢胡，不需要碰杠也可以胡
                     )
@@ -1289,7 +1292,6 @@ int Table::start_next_bet(int flag)
                 }
                 else
                 {
-                    seat.hole_cards.analysis_card_type(last_card.value);
                     actions[NOTICE_HU] = 1;
                     actions[NOTICE_GUO] = 1;
                     packet.val["hu_card"] = last_card.value;
@@ -2362,7 +2364,10 @@ int Table::next_player_seat()
                     continue;
                 }
 
-                if (seat.gang_count[1] == 0 &&                        //没有转弯豆（碰杠）是不能胡牌
+                seat.hole_cards.analysis_card_type(last_card.value);
+                if (seat.is_bao_ting == 0 && seats[chu_seat].is_bao_ting == 0 &&
+                    seat.hole_cards.card_type == CARD_TYPE_PING_HU &&
+                    seat.gang_count[1] == 0 &&                        //没有转弯豆（碰杠）是不能胡牌
                     seats[chu_seat].last_actions[1] != PLAYER_GANG && //如果被胡玩家之前的操作是杠,则杠之后出的牌是可以不用碰杠也可以胡
                     seats[chu_seat].last_actions[0] != PLAYER_GANG    //如果被胡玩家的当前操作是碰杠，则这个杠可以被抢胡，不需要碰杠也可以胡
                     )
@@ -2371,7 +2376,6 @@ int Table::next_player_seat()
                     continue;
                 }
 
-                seat.hole_cards.analysis_card_type(last_card.value);
                 //if (seat.hole_cards.card_type == CARD_TYPE_PING_HU && fang_pao == 0)
                 //{
                 //if ((!(seats[chu_seat].hole_cards.cards.size() == 1 && seats[chu_seat].hole_cards.an_gang_count == 0))
@@ -4401,7 +4405,7 @@ int Table::calculate_base_score(int sid, int pao, int card_value)
         seat.hu_pai_lei_xing = "碰碰胡";
         break;
     case CARD_TYPE_QI_XIAO_DUI: // 7小对
-        score = 5;
+        score = 10;
         seat.hu_pai_lei_xing = "七小对";
         break;
     case CARD_TYPE_LONG_QI_DUI: //龙七对
@@ -4937,7 +4941,7 @@ void Table::update_account_bet()
                 ji_pai[0].type = JIN_JI;
                 mjlog.debug("jipai has jin ji[yao ji]\n", ji.value);
             }
-            else if (ji.value == 2 * 16 + 8)
+            else if (ji.value == 2 * 16 + 8 && (wu_gu_ji == 1))
             {
                 ji_pai[1].type = JIN_JI;
                 mjlog.debug("jipai has jin ji[wu gu ji]\n", ji.value);
@@ -4965,7 +4969,7 @@ void Table::update_account_bet()
             ji_pai[0].type = JIN_JI;
             mjlog.debug("jipai has jin ji[yao ji]\n", ji1.value);
         }
-        else if (ji1.value == 2 * 16 + 8)
+        else if (ji1.value == 2 * 16 + 8 && (wu_gu_ji == 1) )
         {
             ji_pai[1].type = JIN_JI;
             mjlog.debug("jipai has jin ji[wu gu ji]\n", ji1.value);
@@ -4990,7 +4994,7 @@ void Table::update_account_bet()
             ji_pai[0].type = JIN_JI;
             mjlog.debug("jipai has jin ji[yao ji]\n", ji2.value);
         }
-        else if (ji2.value == 2 * 16 + 8)
+        else if (ji2.value == 2 * 16 + 8 && (wu_gu_ji == 1) )
         {
             ji_pai[1].type = JIN_JI;
             mjlog.debug("jipai has jin ji[wu gu ji]\n", ji2.value);
@@ -5009,7 +5013,19 @@ void Table::update_account_bet()
         {
             continue;
         }
+        if (is_re_pao || is_qiang_gang) //热炮，抢杠，和荒庄的情况下鸡和豆的分数全不算。
+            continue;
+        //热炮的玩家不能计鸡分
+        if (is_re_pao && (j == chu_seat))
+        {
+            continue;
+        }
 
+        seats[j].hole_cards.analysis();
+        if (seats[j].hole_cards.ting_cards.size() <= 0) //没有叫牌的玩家，不算鸡分
+        {
+            continue;
+        }
         for (int i = 0; i < horse_count; i++)
         { //循环每张鸡牌
             //查看玩家的手牌
@@ -5044,7 +5060,7 @@ void Table::update_account_bet()
                     }
                     if (seats[j].hole_cards.obsorb_cards[k][h] == 0) //暗杠
                     {
-                        for (unsigned int h2 = 0; h < seats[j].hole_cards.obsorb_cards[k].size(); ++h2)
+                        for (unsigned int h2 = 0; h2 < seats[j].hole_cards.obsorb_cards[k].size(); ++h2)
                         { //找到暗杠的面值是否是鸡牌
                             if (seats[j].hole_cards.obsorb_cards[k][h2] == ji_pai[i].value)
                             {
@@ -5077,6 +5093,12 @@ void Table::update_account_bet()
         }
         //热炮的玩家不能计鸡分
         if (is_re_pao && i == chu_seat)
+        {
+            continue;
+        }
+
+        seats[i].hole_cards.analysis();
+        if (seats[i].hole_cards.ting_cards.size() <= 0) //没有叫牌的玩家，不算鸡分
         {
             continue;
         }
@@ -5422,10 +5444,21 @@ void Table::update_account_bet()
             if (secondValue.find(LIAN_ZHUANG_TYPE) != secondValue.end())
             {
                 score_from_players_item_total[i][LIAN_ZHUANG_TYPE] += secondValue[LIAN_ZHUANG_TYPE];
-
-                score_to_players_item_total[firstValue][LIAN_ZHUANG_TYPE] += secondValue[LIAN_ZHUANG_TYPE];
-                mjlog.debug("score item lian_zhuang_type# from[%d] cnt[%d] to[%d] cnt[%d] \n", score_from_players_item_total[i][LIAN_ZHUANG_TYPE], score_from_players_item_count[i][LIAN_ZHUANG_TYPE],
-                            score_to_players_item_total[firstValue][LIAN_ZHUANG_TYPE], score_to_players_item_count[firstValue][LIAN_ZHUANG_TYPE]);
+                mjlog.debug("score item lian_zhuang_type# from[%d] cnt[%d]\n", score_from_players_item_total[i][LIAN_ZHUANG_TYPE], score_from_players_item_count[i][LIAN_ZHUANG_TYPE]);
+                if (pao_hu_seat > 0)
+                    score_to_players_item_total[firstValue][LIAN_ZHUANG_TYPE] += secondValue[LIAN_ZHUANG_TYPE];
+                else if (gang_hu_seat > 0)
+                    score_to_players_item_total[firstValue][LIAN_ZHUANG_TYPE] += secondValue[LIAN_ZHUANG_TYPE];
+                else
+					for (int j = 0; j < seat_max; j++)
+					{
+						if (seats[j].ready != 1 || i == j)
+						{
+							continue;
+						}
+						score_to_players_item_total[j][LIAN_ZHUANG_TYPE] += secondValue[LIAN_ZHUANG_TYPE] / (max_ready_players - 1);
+						mjlog.debug("score item lian_zhuang_type# to[%d] cnt[%d] \n", score_to_players_item_total[j][LIAN_ZHUANG_TYPE], score_to_players_item_count[j][LIAN_ZHUANG_TYPE]);
+					}
             }
 
             //鸡
@@ -6916,7 +6949,7 @@ void Table::huang_zhuang_cha_jiao()
         seats[i].hole_cards.analysis();
 
         //不叫牌玩家需要给叫牌玩家按牌型分别支付分值。
-        if (seats[i].hole_cards.ting_cards.size() > 0)
+        if (seats[i].hole_cards.ting_cards.size() > 0 && seats[i].hole_cards.hu_cards.size() > 0)
         { //选出最大听牌的牌型
             seats[i].jiao_pai = 1;
             ++jiao_pai_cnt;
@@ -6950,7 +6983,7 @@ void Table::huang_zhuang_cha_jiao()
                     seats[i].score = seats[i].jiao_pai_max_score;
                     seats[i].bet += seats[i].jiao_pai_max_score;
                     seats[i].score_from_players_detail[j][JIAO_PAI_TYPE] += seats[i].jiao_pai_max_score;
-                    score_from_players_item_count[i][JIAO_PAI_TYPE]++;
+                    score_from_players_item_count[i][JIAO_PAI_TYPE]=1;
                     score_to_players_item_count[j][JIAO_PAI_TYPE]++;
                     mjlog.debug("HUAN ZHUANG CHA JIAO seatsid[%d] win %d seatsid[%d] lose\n", i, seats[i].jiao_pai_max_score, j);
                     seats[j].bet -= seats[i].jiao_pai_max_score;
