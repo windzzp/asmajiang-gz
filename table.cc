@@ -6781,6 +6781,7 @@ void Table::huang_zhuang_cha_jiao()
         return;
     }
 
+    jiao_pai_cnt = 0;
     for (int i = 0; i < seat_max; i++)
     {
         seats[i].jiao_pai = 0; //叫牌玩家清0
@@ -6788,7 +6789,6 @@ void Table::huang_zhuang_cha_jiao()
         {
             continue;
         }
-        jiao_pai_cnt = 0;
         seats[i].hole_cards.analysis();
 
         //不叫牌玩家需要给叫牌玩家按牌型分别支付分值。
