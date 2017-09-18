@@ -153,6 +153,7 @@ typedef struct
 	int already_get_red;
 	int city_red_falg;
     int score;  // 基础分(含特殊牌型翻倍)
+    int get_next_card_cnt;
 	
     void clear(void)
     {
@@ -178,6 +179,7 @@ typedef struct
         robot_flag = 0;
         timeout_count = 0;
         dismiss = 0;
+        get_next_card_cnt = 0;
 
         for (int i = 0; i < 4; i++)
         {
@@ -252,6 +254,7 @@ typedef struct
         robot_flag = 0;
         timeout_count = 0;
         horse_count = 0;
+        get_next_card_cnt = 0;
 
         for (int i = 0; i < 4; i++)
         {

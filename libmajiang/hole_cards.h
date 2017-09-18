@@ -217,6 +217,8 @@ private:
     bool is_jin_gou_diao(vector<Card>& acards);   // 金钩钓
     bool is_jiang_jin_gou_diao(vector<Card>& acards); // 将金钩钓
     bool is_qing_jin_gou_diao(vector<Card>& acards); // 清金钩钓
+    bool is_bian_qia_diao(vector<Card>& acards); // 边卡吊
+    bool is_da_kuan_zhang(vector<Card>& acards); // 大宽张
 
     bool normal_cards_analysis(vector<Card> &newcards, int value, Card& card);
     bool ghost_cards_analysis(vector<Card> &newcards, int value, Card& card);

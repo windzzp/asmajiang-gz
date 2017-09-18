@@ -1229,6 +1229,7 @@ int Table::start_next_bet(int flag)
         }
 
         deck.get_next_card(seat.hole_cards);
+        seat.get_next_card_cnt++;
         get_card_seat = cur_seat;
         packet.val["card"] = seat.hole_cards.last_card.value;
         packet.val["remain_cards"] = deck.size();
@@ -1355,6 +1356,7 @@ int Table::start_next_bet(int flag)
             {
                 deck.get_next_card(seat.hole_cards);
             }
+            seat.get_next_card_cnt++;
 
             handler_recored_mo(seat.hole_cards.last_card.value, seat.seatid, -1);
             seat.guo_hu_cards.clear();
@@ -1373,7 +1375,6 @@ int Table::start_next_bet(int flag)
         }
 
         seat.hole_cards.analysis();
-
         mjlog.debug("start_next_bet last_action get next card[%d]\n", seat.hole_cards.last_card.value);
 
         if (seat.hole_cards.permit_hu() && last_action != PLAYER_PENG && seat.forbid_hu == 0)
@@ -1383,6 +1384,25 @@ int Table::start_next_bet(int flag)
             hu_card = seat.hole_cards.last_card.value;
             packet.val["hu_card"] = seat.hole_cards.last_card.value;
             seat.hu = 1;
+        }
+
+        if (seat.get_next_card_cnt == 1)
+        { //判断是否有天听
+            if (seat.hole_cards.permit_ting())
+            {
+                int index = 0;
+                std::map<int, vector<Card> >::iterator it = seat.hole_cards.ting_cards.begin();
+                for (; it != seat.hole_cards.ting_cards.end(); it++)
+                {
+                    packet.val["ting_cards"].append(it->first);
+                    int size = it->second.size();
+                    for (int j = 0; j < size; j++)
+                    {
+                        packet.val["ting_pattern"][index].append(it->second[j].value);
+                    }
+                    index++;
+                }
+            }
         }
 
         if (seat.ting != 1)
@@ -3737,7 +3757,7 @@ int Table::handler_ting(Player *player)
         return -1;
     }
 
-    if (seat.last_actions[0] == -1)
+    if (seat.get_next_card_cnt == 1)
     {
         seat.is_bao_ting = 1;
     }

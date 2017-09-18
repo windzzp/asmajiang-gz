@@ -34,7 +34,9 @@ enum CardType
     CARD_TYPE_JIANG_JIN_GOU_DIAO = 28, // 将金钩钓
     CARD_TYPE_QING_JIN_GOU_DIAO = 29, // 清金钩钓
     CARD_TYPE_QING_SHI_BA_LUO_HAN = 30, // 清一色十八罗汉
-    CARD_TYPE_QING_HAS_YAO_JIU = 31
+    CARD_TYPE_QING_HAS_YAO_JIU = 31,
+	CARD_TYPE_BIAN_QIA_DIAO = 32,//边卡吊
+	CARD_TYPE_DA_KUAN_ZHANG = 33,//大宽张
 };
 
 #endif /* _CARD_TYPE_H_ */
