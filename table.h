@@ -154,7 +154,7 @@ typedef struct
 	int city_red_falg;
     int score;  // 基础分(含特殊牌型翻倍)
     int get_next_card_cnt;
-	
+    vector<int> set_hole_cards;	
     void clear(void)
     {
     	// enable = 0; // 手否激活
@@ -234,6 +234,7 @@ typedef struct
         has_chong_feng_wu_gu_ji = 0;
         score_from_players_detail.clear();
         hu_pai_lei_xing = "";
+        set_hole_cards.clear();
     }
 
     void reset(void)
@@ -295,6 +296,7 @@ typedef struct
         has_yao_ji = 0; 
         score_from_players_detail.clear();
         hu_pai_lei_xing = "";
+        set_hole_cards.clear();
     }
 } Seat;
 
@@ -629,6 +631,7 @@ public:
 
     int next_player_seatid_of(int cur_player);
     int pre_player_seatid_of(int cur_player);
+    int get_set_hole_cards(Player *player);
 };
 
 #endif

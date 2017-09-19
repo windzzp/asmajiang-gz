@@ -1114,6 +1114,10 @@ int Table::game_start()
             continue;
         }
 
+        if (set_card_flag == 1)
+		{
+			get_set_hole_cards(player);
+		}
         Jpacket packet;
         packet.val["cmd"] = SERVER_GAME_START_BC;
         packet.val["uid"] = player->uid;
@@ -1132,7 +1136,18 @@ int Table::game_start()
             packet.val["cur_seats"].append(i);
         }
 
-        deck.get_hole_cards(seat.hole_cards);
+        if (seat.set_hole_cards.size() == 13 && set_card_flag == 1)
+		{
+			for(unsigned int k = 0; k < seat.set_hole_cards.size(); k ++)
+			{
+				deck.get_next_card(seat.hole_cards, seat.set_hole_cards[k]);
+			}
+			deck.get_count = 0;
+		}
+		else 
+		{
+			deck.get_hole_cards(seat.hole_cards);
+		}
         dump_hole_cards(seat.hole_cards.cards, next, 0);
         vector_to_json_array(seat.hole_cards.cards, packet, "holes");
         packet.end();
@@ -6899,4 +6914,46 @@ int Table::pre_player_seatid_of(int cur_player)
         return pre_player;
     }
     return -1;
+}
+
+//从redis 中读取测试的所需牌值
+int Table::get_set_hole_cards(Player * player)
+{
+	if(set_card_flag ==0)
+	{
+		return -1;
+	}
+    char buff[128] = {0, };
+
+   	snprintf(buff, 128, "hc_%d", player->uid);
+
+	if(zjh.temp_rc->command("LLEN %s",buff) < 0)
+	{
+		mjlog.debug("get_set_hole_cards llen %s error \n", buff);
+		return-1;
+	}
+
+	int len  = zjh.temp_rc->reply->integer;
+	mjlog.debug("get_set_hole_cards cards len [%d] \n", len);
+	if(len < 0)
+	{
+		return -1;
+	}
+
+	char buff1[128] = {0, };
+	for(int i =0;i<len;i++)
+	{
+		int ret = zjh.temp_rc->command("RPOP %s",buff);
+		if(ret < 0)
+		{
+			continue;
+		}
+		
+		unsigned int card_value = 0;
+		sscanf(zjh.temp_rc->reply->str, "%x", &card_value);
+		snprintf(buff1, 128, "%d_", card_value);
+		seats[player->seatid].set_hole_cards.push_back(card_value);
+	}
+	mjlog.debug("get_set_hole_cards buff1 [%s]\n",buff1);
+	return 0;
 }
