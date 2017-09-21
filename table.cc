@@ -1300,6 +1300,8 @@ int Table::start_next_bet(int flag)
                 if (seat.is_bao_ting == 0 && seats[chu_seat].is_bao_ting == 0 &&
                     seat.hole_cards.card_type == CARD_TYPE_PING_HU &&
                     seat.gang_count[1] == 0 &&                        //没有转弯豆（碰杠）是不能胡牌
+                    seat.gang_count[2] == 0 &&                        //没有转弯豆（碰杠）是不能胡牌
+                    seat.gang_count[3] == 0 &&                        //没有转弯豆（碰杠）是不能胡牌
                     seats[chu_seat].last_actions[1] != PLAYER_GANG && //如果被胡玩家之前的操作是杠,则杠之后出的牌是可以不用碰杠也可以胡
                     seats[chu_seat].last_actions[0] != PLAYER_GANG    //如果被胡玩家的当前操作是碰杠，则这个杠可以被抢胡，不需要碰杠也可以胡
                     )
@@ -1401,33 +1403,18 @@ int Table::start_next_bet(int flag)
             seat.hu = 1;
         }
 
-        if (seat.get_next_card_cnt == 1)
-        { //判断是否有天听
-            if (seat.hole_cards.permit_ting())
-            {
-                int index = 0;
-                std::map<int, vector<Card> >::iterator it = seat.hole_cards.ting_cards.begin();
-                for (; it != seat.hole_cards.ting_cards.end(); it++)
-                {
-                    packet.val["ting_cards"].append(it->first);
-                    int size = it->second.size();
-                    for (int j = 0; j < size; j++)
-                    {
-                        packet.val["ting_pattern"][index].append(it->second[j].value);
-                    }
-                    index++;
-                }
-            }
-        }
 
         if (seat.ting != 1)
         {
-            // if (seat.hole_cards.ting_cards.size() > 0)
-            // {
-            //     actions[NOTICE_TING] = 1;
-            //     actions[NOTICE_GUO] = 1;
-            //     handler = 1;
-            // }
+            if (seat.get_next_card_cnt == 1)
+            { //判断是否有天听
+                if (seat.hole_cards.ting_cards.size() > 0)
+                {
+                    actions[NOTICE_TING] = 1;
+                    actions[NOTICE_GUO] = 1;
+                    // handler = 1;
+                }
+            }
             // 最后一张不允许杠
             if (seat.hole_cards.permit_gang() && handler == 0 && deck.permit_get() == 1 && last_action != PLAYER_PENG)
             {
@@ -2403,6 +2390,8 @@ int Table::next_player_seat()
                 if (seat.is_bao_ting == 0 && seats[chu_seat].is_bao_ting == 0 &&
                     seat.hole_cards.card_type == CARD_TYPE_PING_HU &&
                     seat.gang_count[1] == 0 &&                        //没有转弯豆（碰杠）是不能胡牌
+                    seat.gang_count[2] == 0 &&                        //没有转弯豆（碰杠）是不能胡牌
+                    seat.gang_count[3] == 0 &&                        //没有转弯豆（碰杠）是不能胡牌
                     seats[chu_seat].last_actions[1] != PLAYER_GANG && //如果被胡玩家之前的操作是杠,则杠之后出的牌是可以不用碰杠也可以胡
                     seats[chu_seat].last_actions[0] != PLAYER_GANG    //如果被胡玩家的当前操作是碰杠，则这个杠可以被抢胡，不需要碰杠也可以胡
                     )
@@ -4709,7 +4698,7 @@ void Table::update_account_bet()
             }
             else
             {
-                if (seats[i].hole_cards.ting_cards.size() == 0)
+                if (seats[i].hole_cards.hu_cards.size() == 0)
                     seats[i].hu_pai_lei_xing = "未叫牌";
                 else
                     seats[i].hu_pai_lei_xing = "叫牌";
@@ -4742,7 +4731,7 @@ void Table::update_account_bet()
             }
             else
             {
-                if (seats[i].hole_cards.ting_cards.size() == 0)
+                if (seats[i].hole_cards.hu_cards.size() == 0)
                     seats[i].hu_pai_lei_xing = "未叫牌";
                 else
                     seats[i].hu_pai_lei_xing = "叫牌";
@@ -4780,7 +4769,7 @@ void Table::update_account_bet()
             }
             else
             {
-                if (seats[i].hole_cards.ting_cards.size() == 0)
+                if (seats[i].hole_cards.hu_cards.size() == 0)
                     seats[i].hu_pai_lei_xing = "未叫牌";
                 else
                     seats[i].hu_pai_lei_xing = "叫牌";
@@ -4937,10 +4926,16 @@ void Table::update_account_bet()
         }
 
         seats[j].hole_cards.analysis();
-        if (seats[j].hole_cards.ting_cards.size() <= 0) //没有叫牌的玩家，不算鸡分
+        if (seats[j].hole_cards.hu_cards.size() <= 0) //没有叫牌的玩家，不算鸡分
         {
             continue;
         }
+
+        if (j != win_seatid && bao_ji != 1) //在非包鸡情况下，只有赢牌玩家才算鸡分
+        {
+            continue;
+        }
+
 
         for (int i = 0; i < horse_count; i++)
         { //循环每张鸡牌
@@ -5014,11 +5009,14 @@ void Table::update_account_bet()
         }
 
         seats[i].hole_cards.analysis();
-        if (seats[i].hole_cards.ting_cards.size() <= 0) //没有叫牌的玩家，不算鸡分
+        if (seats[i].hole_cards.hu_cards.size() <= 0) //没有叫牌的玩家，不算鸡分
         {
             continue;
         }
-
+        if (i != win_seatid && bao_ji != 1) //在非包鸡情况下，只有赢牌玩家才算鸡分
+        {
+            continue;
+        }
         for (int j = 0; j < seats[i].horse_count; ++j)
         {
 
@@ -5098,7 +5096,7 @@ void Table::update_account_bet()
             }
         }
 
-        if (bao_ji == 1) //包鸡玩法
+        if (bao_ji == 1 || win_seatid == i) //算冲锋鸡，冲锋乌骨鸡，责任鸡
         {
             int c = 1;
             if (i != win_seatid && seats[i].gang_hu_flag != 1 && seats[i].pao_hu_flag != 1 && seats[i].hole_cards.ting_cards.size() == 0) //听牌玩家也算鸡分
@@ -5879,7 +5877,7 @@ string Table::format_card_desc(int card_type, int seatid)
     {
         if (seats[seatid].hole_cards.men_qing_flag && (card_type != CARD_TYPE_PING_HU || (card_type == CARD_TYPE_PING_HU && seats[seatid].hole_cards.cards.size() % 3 == 2)))
         {
-            str_special += "门清, ";
+            // str_special += "门清, ";
         }
     }
 
@@ -6827,7 +6825,7 @@ void Table::huang_zhuang_cha_jiao()
         seats[i].hole_cards.analysis();
 
         //不叫牌玩家需要给叫牌玩家按牌型分别支付分值。
-        if (seats[i].hole_cards.ting_cards.size() > 0 && seats[i].hole_cards.hu_cards.size() > 0)
+        if (seats[i].hole_cards.hu_cards.size() > 0)
         { //选出最大听牌的牌型
             seats[i].jiao_pai = 1;
             ++jiao_pai_cnt;
@@ -6856,7 +6854,7 @@ void Table::huang_zhuang_cha_jiao()
                 {
                     continue;
                 }
-                if (seats[j].hole_cards.ting_cards.size() == 0 || seats[j].hole_cards.hu_cards.size() <= 0) //没有听牌玩家
+                if (seats[j].hole_cards.hu_cards.size() <= 0) //没有听牌玩家
                 {
                     seats[i].score = seats[i].jiao_pai_max_score;
                     seats[i].bet += seats[i].jiao_pai_max_score;
