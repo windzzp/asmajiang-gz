@@ -1097,6 +1097,7 @@ int Table::game_start()
 
     replay.init(ts, ttid);
     init_dealer();
+    hu_seat = -1;
     pao_hu_seat = -1;
     gang_hu_seat = -1;
 
@@ -2777,7 +2778,6 @@ void Table::init_dealer()
         else
             seats[dealer].lian_zhuang_cnt = 1;
         dealer = hu_seat;
-        hu_seat = -1;
         return;
     }
     // 荒庄
@@ -2815,7 +2815,7 @@ void Table::init_dealer()
     }
     //有人叫牌，有人不叫牌。在叫牌者中，有庄家则连庄。没庄家则离庄家最近的下家接庄;
     int next = dealer;
-    for (int i = 1; i < seat_max; i++)
+    for (int i = 0; i < seat_max; i++)
     {
         next = (dealer + i) % seat_max;
         if (seats[next].occupied != 1)
