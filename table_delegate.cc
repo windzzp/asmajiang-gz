@@ -196,7 +196,7 @@ void TableDelegate::init_table_type(Table* table, Json::Value &val, int robot)
         {
             substitute = val["substitute"].asInt();
         }
-
+        table->config_of_replay = val;
         table->init_table_type(table_type, has_ghost, has_feng, hu_pair, horse_num, max_play_count, ping_hu_fang_pao, dead_double,
                                forbid_same_ip, forbid_same_place, substitute, cost_select_flag, ben_ji, wu_gu_ji, bao_ji);
     }

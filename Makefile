@@ -6,7 +6,7 @@ CXXFLAGS = -g -O0 -fexceptions -Wall
 INCPATH = -I/usr/local/include -I./libmajiang
 LD = gcc
 LFLAGS =
-LIBS = -L. -L./libmajiang -L/usr/local/lib -lmajiang -lstdc++ -lev -ljsoncpp -lhiredis -lgame
+LIBS = -L. -L./libmajiang -L/usr/local/lib -lmajiang -lstdc++ -lev -ljsoncpp -lhiredis -lgame -lz
 
 STATIC_LIB = libgame.a
 OBJECTS_LIB = zjh.o client.o daemonize.o log.o log_agent.o player.o redis_client.o game.o jpacket.o
