@@ -154,7 +154,7 @@ typedef struct
 	int city_red_falg;
     int score;  // 基础分(含特殊牌型翻倍)
     int get_next_card_cnt;
-    vector<int> set_hole_cards;	
+    vector<int> set_hole_cards;	    
     void clear(void)
     {
     	// enable = 0; // 手否激活
@@ -467,7 +467,7 @@ public:
 	
 	int							cost_select_flag;		//付费选择标记
 	std::vector<int>            redpackes;
-	int 						red_type;
+    int 						red_type;
 public:
     Table();
     virtual ~Table();
