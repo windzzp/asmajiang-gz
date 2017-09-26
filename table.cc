@@ -4148,7 +4148,7 @@ void Table::dismiss_timer_cb(struct ev_loop *loop, struct ev_timer *w, int reven
 
 int Table::dismiss_timeout()
 {
-    //broadcast_dismiss_status(5);
+    broadcast_dismiss_status(5);
 
     for (int i = 0; i < seat_max; i++)
     {
@@ -4521,7 +4521,10 @@ int Table::calculate_base_score(int sid, int pao, int card_value)
         if (chi_count == 0 && peng_count == 0 && gang_count == 0)
         {
             di_hu_flag = 1;
-            //score *= 2;
+            if (seat.card_type == CARD_TYPE_PING_HU)
+                score = 10;
+            else
+                score += 10;
         }
     }
 
