@@ -1394,7 +1394,7 @@ int Table::start_next_bet(int flag)
 
         if (seat.ting != 1)
         {
-            if (seat.get_next_card_cnt == 1)
+            if (seat.get_next_card_cnt == 1 && seat.horse_cards.size() >= 13)
             { //判断是否有天听
                 if (seat.hole_cards.ting_cards.size() > 0)
                 {
