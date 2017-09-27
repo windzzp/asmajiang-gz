@@ -4479,7 +4479,7 @@ int Table::calculate_base_score(int sid, int pao, int card_value)
             score *= 10; //底分为10
         }
 
-        if (pao_hu_seat > 0 && seats[chu_seat].is_bao_ting == 1) //杀报
+        if (pao_hu_seat > 0 && seats[pao_hu_seat].is_bao_ting == 1) //杀报
         {
             score *= 10;
         }
@@ -4491,7 +4491,7 @@ int Table::calculate_base_score(int sid, int pao, int card_value)
             score *= 2; //底分为10
         }
 
-        if (pao_hu_seat > 0 && seats[chu_seat].is_bao_ting == 1) //杀报
+        if (pao_hu_seat > 0 && seats[pao_hu_seat].is_bao_ting == 1) //杀报
         {
             score *= 2;
         }
@@ -4812,6 +4812,7 @@ void Table::update_account_bet()
                     seats[i].hu_pai_lei_xing = "未叫牌";
                 else
                     seats[i].hu_pai_lei_xing = "叫牌";
+
                 if (gang_shang_hua_seat >= 0)
                 {
                     score_to_players_item_count[gang_shang_hua_seat][ZI_MO_TYPE] = 1;
@@ -5350,6 +5351,19 @@ void Table::update_account_bet()
                         continue;
                     }
                     score_to_players_item_total[j][ZI_MO_TYPE] += secondValue[ZI_MO_TYPE] / (max_ready_players - 1);
+                    if (seats[j].is_bao_ting == 1)
+                    {//报杀玩家多出分
+                        if (seats[j].card_type == CARD_TYPE_PING_HU)
+                        {
+                            score_to_players_item_total[j][ZI_MO_TYPE] += (secondValue[ZI_MO_TYPE] / (max_ready_players - 1)) * 9;
+                            score_from_players_item_total[i][ZI_MO_TYPE] += (secondValue[ZI_MO_TYPE] / (max_ready_players - 1)) * 9;
+                        }
+                        else
+                        {
+                            score_to_players_item_total[j][ZI_MO_TYPE] += (secondValue[ZI_MO_TYPE] / (max_ready_players - 1));
+                            score_from_players_item_total[i][ZI_MO_TYPE] += (secondValue[ZI_MO_TYPE] / (max_ready_players - 1));
+                        }
+                    }
                     mjlog.debug("score item zi_mo_type# to[%d] cnt[%d] \n", score_to_players_item_total[j][ZI_MO_TYPE], score_to_players_item_count[j][ZI_MO_TYPE]);
                 }
             }
