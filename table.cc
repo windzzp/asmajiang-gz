@@ -1392,9 +1392,9 @@ int Table::start_next_bet(int flag)
         }
 
 
-        if (seat.ting != 1)
+        if (seat.ting != 1 && actions[NOTICE_HU] == 0)
         {
-            if (seat.get_next_card_cnt == 1 && seat.horse_cards.size() >= 13)
+            if (seat.get_next_card_cnt == 1 && seat.hole_cards.size() >= 13)
             { //判断是否有天听
                 if (seat.hole_cards.ting_cards.size() > 0)
                 {
@@ -5353,7 +5353,7 @@ void Table::update_account_bet()
                     score_to_players_item_total[j][ZI_MO_TYPE] += secondValue[ZI_MO_TYPE] / (max_ready_players - 1);
                     if (seats[j].is_bao_ting == 1)
                     {//报杀玩家多出分
-                        if (seats[j].card_type == CARD_TYPE_PING_HU)
+                        if (seats[i].card_type == CARD_TYPE_PING_HU)
                         {
                             score_to_players_item_total[j][ZI_MO_TYPE] += (secondValue[ZI_MO_TYPE] / (max_ready_players - 1)) * 9;
                             score_from_players_item_total[i][ZI_MO_TYPE] += (secondValue[ZI_MO_TYPE] / (max_ready_players - 1)) * 9;
