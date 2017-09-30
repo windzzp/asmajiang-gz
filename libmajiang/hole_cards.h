@@ -220,6 +220,15 @@ private:
     bool is_bian_qia_diao(vector<Card>& acards); // 边卡吊
     bool is_da_kuan_zhang(vector<Card>& acards); // 大宽张
 
+	bool is_qing_peng_jin_gou_diao(vector<Card>& acards); // 清碰金钩钓
+	bool is_peng_bian_qia_diao(vector<Card>& acards); // 碰碰胡 + 边卡吊
+	bool is_qing_bian_qia_diao(vector<Card>& acards); // 清一色 + 边卡吊
+	bool is_long_qi_dui_bian_qia_diao(vector<Card>& acards); // 龙七对 + 边卡吊
+	bool is_qing_peng_bian_qia_diao(vector<Card>& acards); // 清一色 + 碰碰胡 + 边卡吊 
+	bool is_qing_long_bian_qia_diao(vector<Card>& acards); // 清龙七对 + 边卡吊 
+	bool is_qing_da_kuan_zhang(vector<Card>& acards); // 清一色 + 大宽张
+	
+
     bool normal_cards_analysis(vector<Card> &newcards, int value, Card& card);
     bool ghost_cards_analysis(vector<Card> &newcards, int value, Card& card);
     bool hu_cards_analysis(vector<Card> &newcards);

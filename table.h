@@ -100,6 +100,7 @@ typedef struct
     int gang_hu_flag; // 抢杠胡
     int pao_hu_flag;
     int horse_count;
+    int get_next_card_cnt; //玩家拿牌的次数
 
     std::map<int, int> peng_record; // 碰牌记录 seat id => count
     std::map<int, int> peng_card_record; // 碰牌记录 card => seatid
@@ -153,7 +154,6 @@ typedef struct
 	int already_get_red;
 	int city_red_falg;
     int score;  // 基础分(含特殊牌型翻倍)
-    int get_next_card_cnt;
     vector<int> set_hole_cards;	    
     void clear(void)
     {
@@ -179,7 +179,6 @@ typedef struct
         robot_flag = 0;
         timeout_count = 0;
         dismiss = 0;
-        get_next_card_cnt = 0;
 
         for (int i = 0; i < 4; i++)
         {
@@ -234,6 +233,7 @@ typedef struct
         has_chong_feng_wu_gu_ji = 0;
         score_from_players_detail.clear();
         hu_pai_lei_xing = "";
+        get_next_card_cnt = 0;
         set_hole_cards.clear();
     }
 
@@ -357,6 +357,7 @@ public:
     ev_timer                    compare_timer;
     ev_tstamp                   compare_timer_stamp;
 
+    
     //ev_timer                    single_ready_timer;
     //ev_tstamp                   single_ready_timer_stamp;
     int                         cur_flow_mode;
@@ -438,6 +439,9 @@ public:
 
     ev_timer 					subs_timer;
     ev_tstamp 					subs_timer_stamp;
+	
+	ev_timer ji_card_timer;
+    ev_tstamp ji_card_stamp;
 	int                         substitute;
     Replay                      replay;
 
@@ -468,6 +472,10 @@ public:
 	int							cost_select_flag;		//付费选择标记
 	std::vector<int>            redpackes;
     int 						red_type;
+
+    int already_update_account_bet;
+    int bao_ting;
+    int sha_bao;
     Json::Value                 config_of_replay;  //配置
 public:
     Table();
@@ -624,6 +632,9 @@ public:
     int next_player_seatid_of(int cur_player);
     int pre_player_seatid_of(int cur_player);
     int get_set_hole_cards(Player *player);
+
+    static void ji_card_timer_cb(struct ev_loop *loop, struct ev_timer *w, int revents);
+    void ji_game_end();
 };
 
 #endif

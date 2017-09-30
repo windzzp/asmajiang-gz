@@ -131,6 +131,8 @@ enum server_command
     SERVER_SUBSTITUTE_SUCC_UC = 4058,
 
     SERVER_GET_INTERNET_UC         = 4070,
+
+    SERVER_DISPLAY_JI_CARD_SUIT_SUCC_BC = 4085,     //显示鸡牌过程
 };
 
 #endif
