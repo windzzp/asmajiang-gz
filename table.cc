@@ -5103,6 +5103,34 @@ void Table::update_account_bet()
         seats[i].hole_cards.analysis();
         if (i != win_seatid && seats[i].hole_cards.hu_cards.size() <= 0) //没有叫牌的玩家，不算鸡分
         {
+            if (bao_ji == 1 && ( seats[i].has_ze_ren_ji == 1 || seats[i].has_wu_gu_ze_ren_ji == 1))
+            {
+                for (int j = 0; j < seat_max; j++)
+                {
+                    if (i == j)
+                        continue;
+                    if (seats[j].ready != 1)
+                    {
+                        continue;
+                    }
+                    if (seats[i].has_ze_ren_ji == 1)
+                    {
+                        seats[j].score_from_players_detail[i][ZE_REN_JI_TYPE] = 1; //不管输赢，有责任鸡都输出1分
+                        score_from_players_item_count[j][ZE_REN_JI_TYPE] = 1;
+                        score_to_players_item_count[i][ZE_REN_JI_TYPE]++;
+                        mjlog.debug("jipai seats[%d] you ze ren ji.\n", i);
+                    }
+                    if (seats[i].has_wu_gu_ze_ren_ji == 1)
+                    {
+                        seats[j].score_from_players_detail[i][ZE_REN_JI_TYPE] = 1; //不管输赢，有责任鸡都输出1分
+                        score_from_players_item_count[j][ZE_REN_JI_TYPE] = 1;
+                        if (seats[i].has_ze_ren_ji == 1)
+                            score_from_players_item_count[j][ZE_REN_JI_TYPE] = 2;
+                        score_to_players_item_count[i][ZE_REN_JI_TYPE]++;
+                        mjlog.debug("jipai seats[%d] you wu gu ze ren ji.\n", i);
+                    }
+                }
+            }
             continue;
         }
         if (bao_ji != 1) //在非包鸡情况下，只有赢牌玩家才算鸡分
@@ -6978,6 +7006,10 @@ void Table::ji_game_end()
     packet.val["cmd"] = SERVER_DISPLAY_JI_CARD_SUIT_SUCC_BC;
     for (unsigned int i = 0; i < ji_pai.size(); ++i)
     {
+        if (ji_pai[i].type == WU_GU_JI || ji_pai[i].type == CHONG_FENG_WU_GU_JI || ji_pai[i].type == YAO_JI || ji_pai[i].type == CHONG_FEN_JI || ji_pai[i].type == ZE_REN_JI || ji_pai[i].type == JIN_JI)
+        {
+            continue;
+        }
         packet.val["value"].append(ji_pai[i].value);
         packet.val["type"].append(ji_pai[i].type);
     }
