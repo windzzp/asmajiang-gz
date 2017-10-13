@@ -635,6 +635,7 @@ public:
 
     static void ji_card_timer_cb(struct ev_loop *loop, struct ev_timer *w, int revents);
     void ji_game_end();
+    void record_table_info();
 };
 
 #endif
