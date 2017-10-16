@@ -3795,6 +3795,9 @@ int Table::handler_ting(Player *player)
         return -1;
     }
 
+    last_card.set_value(card);
+    chu_seat = seat.seatid;
+    seat.hole_cards.handler_chu(card);
     int ret = seat.hole_cards.handler_ting(card);
     if (ret < 0)
     {
@@ -3814,6 +3817,64 @@ int Table::handler_ting(Player *player)
     seat.ting = 1;
 
     Jpacket packet;
+    Jpacket packet1;
+    if (card == 1 && has_chong_feng_ji != 1 && has_ze_ren_ji != 1) //1条
+    {
+        seat.has_chong_feng_ji = 1; //记录哪个玩家有冲锋鸡
+        has_chong_feng_ji = 1;      //用于决断是否出现冲锋鸡。
+        packet.val["is_chong_feng_ji"] = 1;
+        packet1.val["is_chong_feng_ji"] = 1;
+        seat.has_ze_ren_ji = 2; //为2的时候，表示下次谁碰了，冲锋鸡变成责任鸡
+        has_ze_ren_ji = 2;
+    }
+    else
+    {
+        if (has_ze_ren_ji == 2 || seat.has_ze_ren_ji == 2)
+        {
+            seat.has_ze_ren_ji = 0; //为0的时候，表示下次谁碰了，冲锋鸡不会变成责任鸡
+            has_ze_ren_ji = 0;
+        }
+        if (card == 1)
+        {
+            seat.has_yao_ji++;
+            has_yao_ji++;
+        }
+        packet.val["is_chong_feng_ji"] = 0;
+        packet1.val["is_chong_feng_ji"] = 0;
+    }
+
+    if (wu_gu_ji == 1)
+    {
+        if (card == (2 * 16 + 8) && has_chong_feng_wu_gu_ji != 1 && has_wu_gu_ze_ren_ji != 1) //八筒
+        {
+            seat.has_chong_feng_wu_gu_ji = 1; //记录哪个玩家有乌骨鸡
+            has_chong_feng_wu_gu_ji = 1;      //用于决断是否出现乌骨鸡。
+            packet1.val["is_wu_gu_ji"] = 1;
+            packet.val["is_wu_gu_ji"] = 1;
+            seat.has_wu_gu_ze_ren_ji = 2; //为2的时候，表示下次谁碰了，冲锋鸡变成责任鸡
+            has_wu_gu_ze_ren_ji = 2;
+        }
+        else
+        {
+            if (has_wu_gu_ze_ren_ji == 2 || seat.has_wu_gu_ze_ren_ji == 2) //第2个八筒，即使碰了也不会变成责任鸡
+            {
+                seat.has_wu_gu_ze_ren_ji = 0; //为0的时候，表示下次谁碰了，乌骨鸡不会变成责任鸡
+                has_wu_gu_ze_ren_ji = 0;
+            }
+            if (card == 2 * 16 + 8)
+            {
+                seat.has_wu_gu_ji++;
+                has_wu_gu_ji++;
+            }
+            packet1.val["is_wu_gu_ji"] = 0;
+            packet.val["is_wu_gu_ji"] = 0;
+        }
+    }
+
+    seat.last_actions[1] = seat.last_actions[0];
+    seat.last_actions[0] = action;
+    seat.actions.push_front(action);
+
     packet.val["cmd"] = SERVER_BET_SUCC_BC;
     packet.val["seatid"] = player->seatid;
     packet.val["uid"] = player->uid;
@@ -3828,7 +3889,6 @@ int Table::handler_ting(Player *player)
     unicast(player, packet.tostring());
     replay.append_record(packet.tojson());
 
-    Jpacket packet1;
     packet1.val["cmd"] = SERVER_BET_SUCC_BC;
     packet1.val["seatid"] = player->seatid;
     packet1.val["uid"] = player->uid;
@@ -6997,12 +7057,11 @@ void Table::ji_game_end()
     packet.val["cmd"] = SERVER_DISPLAY_JI_CARD_SUIT_SUCC_BC;
     for (unsigned int i = 0; i < ji_pai.size(); ++i)
     {
-        if (ji_pai[i].type == WU_GU_JI || ji_pai[i].type == CHONG_FENG_WU_GU_JI || ji_pai[i].type == YAO_JI || ji_pai[i].type == CHONG_FEN_JI || ji_pai[i].type == ZE_REN_JI || ji_pai[i].type == JIN_JI)
+        if (ji_pai[i].type == BEN_JI || ji_pai[i].type == YAO_BAI_JI)
         {
-            continue;
+            packet.val["value"].append(ji_pai[i].value);
+            packet.val["type"].append(ji_pai[i].type);
         }
-        packet.val["value"].append(ji_pai[i].value);
-        packet.val["type"].append(ji_pai[i].type);
     }
 	packet.end();
     broadcast(NULL, packet.tostring());
