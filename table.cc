@@ -226,7 +226,6 @@ void Table::init_table_type(int set_type, int set_has_ghost, int set_has_feng, i
     wu_gu_ji = set_wu_gu_ji;
     bao_ji = set_bao_ji;
     already_update_account_bet = 0;
-    bao_ting = 0;
     sha_bao = 0;
     deck.init(has_feng, has_ghost, horse_num, hu_pair);
 }
@@ -336,7 +335,6 @@ void Table::reset()
     score_to_players_item_count.clear();
     score_to_players_item_total.clear();
     already_update_account_bet = 0;
-    bao_ting = 0;
     sha_bao = 0;
 }
 void Table::vector_to_json_array(std::vector<ji_data> &cards, Json::Value &val, string key, string key2)
@@ -4568,7 +4566,6 @@ int Table::calculate_base_score(int sid, int pao, int card_value)
     }
     if (seats[sid].is_bao_ting == 1 && is_huang_zhuang == 0) //报听
     {
-        bao_ting = 1;
         if (score == 1)
             score = 10; 
         else
@@ -5949,7 +5946,7 @@ string Table::format_card_desc(int card_type, int seatid)
             str_special = "连杠杠上炮, ";
         }
 
-        if (bao_ting)
+        if (seats[seatid].is_bao_ting)
         {
             str_special = "报听, ";
         }
