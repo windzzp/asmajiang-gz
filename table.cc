@@ -6654,7 +6654,8 @@ void Table::handler_substitute_req(Player *player)
 {
     //int create_rmb = zjh.conf["tables"]["create_rmb"].asInt();
     Json::Value &val = player->client->packet.tojson();
-    std::string describe = val["describe"].asString();
+    std::string describe = val["playway_desc"].asString();
+    int player_max = val["player_max"].asInt();
     // int base_play_board = zjh.conf["tables"]["base_board"].asInt();
 
     player->tid = -1;
@@ -6690,9 +6691,8 @@ void Table::handler_substitute_req(Player *player)
         snprintf(buff + strlen(buff), 128 - strlen(buff), "%s", "死双");
     }
 
-    int ret = zjh.temp_rc->command("hmset create:%d:%d uid %d, tid %d, type %d, size 0, status 0, ts %d, ruler %s",
-                                   player->uid, ttid, player->uid, ttid, type, (int)time(NULL), describe.c_str());
-
+    int ret = zjh.temp_rc->command("hmset create:%d:%d uid %d, tid %d, type %d, size 0, status 0, ts %d, ruler %s player_max %d",
+                                   player->uid, ttid, player->uid, ttid, type, (int)time(NULL), describe.c_str(), player_max);
     owner_uid = player->uid;
     owner_name = player->name;
     owner_sex = player->sex;
