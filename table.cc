@@ -5003,12 +5003,12 @@ void Table::update_account_bet()
             ji.value = deck.horse_cards[i].value;
             if (ji.value == 1)
             {
-                // ji_pai[0].type = JIN_JI;
+                ji_pai[0].type = BEN_JI;
                 mjlog.debug("jipai has jin ji[yao ji]\n", ji.value);
             }
             else if (ji.value == 2 * 16 + 8 && (wu_gu_ji == 1))
             {
-                // ji_pai[1].type = JIN_JI;
+                ji_pai[1].type = BEN_JI;
                 mjlog.debug("jipai has jin ji[wu gu ji]\n", ji.value);
             }
             else
@@ -5031,12 +5031,12 @@ void Table::update_account_bet()
 
         if (ji1.value == 1)
         {
-            //ji_pai[0].type = JIN_JI;
+            ji_pai[0].type = YAO_BAI_JI;
             mjlog.debug("jipai has jin ji[yao ji]\n", ji1.value);
         }
         else if (ji1.value == 2 * 16 + 8 && (wu_gu_ji == 1) )
         {
-            //ji_pai[1].type = JIN_JI;
+            ji_pai[1].type = YAO_BAI_JI;
             mjlog.debug("jipai has jin ji[wu gu ji]\n", ji1.value);
         }
         else
@@ -5056,12 +5056,12 @@ void Table::update_account_bet()
 
         if (ji2.value == 1)
         {
-            //ji_pai[0].type = JIN_JI;
+            ji_pai[0].type = YAO_BAI_JI;
             mjlog.debug("jipai has jin ji[yao ji]\n", ji2.value);
         }
         else if (ji2.value == 2 * 16 + 8 && (wu_gu_ji == 1) )
         {
-            //ji_pai[1].type = JIN_JI;
+            ji_pai[1].type = YAO_BAI_JI;
             mjlog.debug("jipai has jin ji[wu gu ji]\n", ji2.value);
         }
         else
@@ -5191,7 +5191,7 @@ void Table::update_account_bet()
 
             if (seats[i].ji_pai[j].value == 1)
             {
-                if (seats[i].ji_pai[j].type == YAO_BAI_JI)
+                if (seats[i].ji_pai[j].type == BEN_JI || seats[i].ji_pai[j].type == YAO_BAI_JI)
                 {
                     seats[i].ji_pai[j].type = JIN_JI;
                     seats[i].has_jin_ji = 1;
