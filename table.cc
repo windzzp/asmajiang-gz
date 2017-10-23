@@ -140,13 +140,7 @@ int Table::init(int my_tid, int my_vid, int my_zid, int my_type, float my_fee,
     cur_players = 0;
     players.clear();
     ready_players = 0;
-    for (int i = 0; i < seat_max; i++)
-    {
-        seats[i].clear();
-        seats[i].seatid = i;
-        seats[i].lian_zhuang_cnt = 1; //连续作庄
-        seats[i].jiao_pai = 0;
-    }
+    
 
     reset();
     dismiss_flag = 0;
@@ -219,7 +213,13 @@ void Table::init_table_type(int set_type, int set_has_ghost, int set_has_feng, i
     ahead_start_flag = 0;
     ahead_start_uid = -1;
     dead_double = set_dead_double;
-
+    for (int i = 0; i < seat_max; i++)
+    {
+        seats[i].clear();
+        seats[i].seatid = i;
+        seats[i].lian_zhuang_cnt = 1; //连续作庄
+        seats[i].jiao_pai = 0;
+    }
     forbid_same_ip = set_forbid_same_ip;
     forbid_same_place = set_forbid_same_place;
     ben_ji = set_ben_ji;
@@ -227,7 +227,7 @@ void Table::init_table_type(int set_type, int set_has_ghost, int set_has_feng, i
     bao_ji = set_bao_ji;
     already_update_account_bet = 0;
     sha_bao = 0;
-    deck.init(has_feng, has_ghost, horse_num, hu_pair);
+    deck.init(has_feng, has_ghost, horse_num, hu_pair, 0);
 }
 
 int Table::get_card_type(int salt)
@@ -2719,12 +2719,12 @@ void Table::init_dealer()
             if (seats[i].uid == owner_uid)
             {
                 dealer = i;
-                seats[dealer].lian_zhuang_cnt = 1;
+                seats[dealer].lian_zhuang_cnt = 2;
                 return;
             }
         }
         dealer = random_dealer();
-        seats[dealer].lian_zhuang_cnt = 1;
+        seats[dealer].lian_zhuang_cnt = 2;
         return;
     }
 
@@ -2734,7 +2734,7 @@ void Table::init_dealer()
         if (dealer == gang_hu_seat)
             seats[dealer].lian_zhuang_cnt++;
         else
-            seats[dealer].lian_zhuang_cnt = 1;
+            seats[gang_hu_seat].lian_zhuang_cnt = 2;
         dealer = gang_hu_seat;
         return;
     }
@@ -2744,7 +2744,7 @@ void Table::init_dealer()
         if (dealer == pao_hu_seat)
             seats[dealer].lian_zhuang_cnt++;
         else
-            seats[dealer].lian_zhuang_cnt = 1;
+            seats[pao_hu_seat].lian_zhuang_cnt = 2;
         dealer = pao_hu_seat;
         return;
     }
@@ -2767,7 +2767,7 @@ void Table::init_dealer()
             if (dealer == first_hu)
                 seats[dealer].lian_zhuang_cnt++;
             else
-                seats[dealer].lian_zhuang_cnt = 1;
+                seats[first_hu].lian_zhuang_cnt = 2;
             dealer = first_hu;
         }
         return;
@@ -2789,7 +2789,7 @@ void Table::init_dealer()
             if (dealer == first_hu)
                 seats[dealer].lian_zhuang_cnt++;
             else
-                seats[dealer].lian_zhuang_cnt = 1;
+                seats[first_hu].lian_zhuang_cnt = 2;
             dealer = first_hu;
         }
         return;
@@ -2801,7 +2801,7 @@ void Table::init_dealer()
         if (dealer == hu_seat)
             seats[dealer].lian_zhuang_cnt++;
         else
-            seats[dealer].lian_zhuang_cnt = 1;
+            seats[hu_seat].lian_zhuang_cnt = 2;
         dealer = hu_seat;
         return;
     }
@@ -2832,7 +2832,7 @@ void Table::init_dealer()
                 if (dealer == i)
                     seats[dealer].lian_zhuang_cnt++;
                 else
-                    seats[dealer].lian_zhuang_cnt = 1;
+                    seats[i].lian_zhuang_cnt = 2;
                 dealer = i;
             }
         }
@@ -2852,7 +2852,7 @@ void Table::init_dealer()
             if (dealer == i)
                 seats[dealer].lian_zhuang_cnt++;
             else
-                seats[dealer].lian_zhuang_cnt = 1;
+                seats[i].lian_zhuang_cnt = 2;
             dealer = i;
         }
     }
@@ -4943,9 +4943,9 @@ void Table::update_account_bet()
 
                     if (seats[win_seatid].lian_zhuang_cnt > 1) //连庄分
                     {
-                        score_to_players_item_count[i][LIAN_ZHUANG_TYPE]++;
+                        score_to_players_item_count[i][LIAN_ZHUANG_TYPE] = seats[win_seatid].lian_zhuang_cnt - 1;
                     }
-                // }
+                    // }
             }
         }
     }
