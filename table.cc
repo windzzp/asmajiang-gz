@@ -1114,6 +1114,12 @@ int Table::game_start()
     }
 
     init_dealer();
+    for (int i = 0; i < seat_max; i++)
+    {
+        if (i == dealer)
+            continue;
+        seats[i].lian_zhuang_cnt = 1; //连续作庄
+    }
     record_table_info();
     hu_seat = -1;
     pao_hu_seat = -1;
