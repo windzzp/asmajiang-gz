@@ -1831,6 +1831,11 @@ int Table::game_end(int flag)
     packet.val["total_bet"] = total_bet;
     packet.val["cur_round"] = round_count;
 
+    for (unsigned int i = 0; i < deck.cards.size(); i++)
+	{
+		packet.val["lave_cards"].append(deck.cards[i].value);
+    }
+
     if (pao_hu_seat >= 0)
     {
         packet.val["fang_pao_seat"] = pao_hu_seat;
