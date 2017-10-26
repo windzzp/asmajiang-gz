@@ -2138,12 +2138,12 @@ int Table::game_end(int flag)
                     packet.val["players1"][j]["total_record"].append(seat.total_jie_pao);
                     packet.val["players1"][j]["total_record_desc"].append("点炮次数");
                     packet.val["players1"][j]["total_record"].append(seat.total_fang_pao);
-                    packet.val["players1"][j]["total_record_desc"].append("暗杠条数");
-                    packet.val["players1"][j]["total_record"].append(seat.total_an_gang);
-                    packet.val["players1"][j]["total_record_desc"].append("明杠条数");
-                    packet.val["players1"][j]["total_record"].append(seat.total_ming_gang);
-                    packet.val["players1"][j]["total_record_desc"].append("中马数");
-                    packet.val["players1"][j]["total_record"].append(seat.total_zhong_horse);
+                    packet.val["players1"][j]["total_record_desc"].append("中鸡数");
+                    packet.val["players1"][j]["total_record"].append(seat.total_zhong_ji);
+                    packet.val["players1"][j]["total_record_desc"].append("冲锋鸡数");
+                    packet.val["players1"][j]["total_record"].append(seat.total_chong_feng_ji);
+                    packet.val["players1"][j]["total_record_desc"].append("责任鸡数");
+                    packet.val["players1"][j]["total_record"].append(seat.total_ze_ren_ji);
                     j++;
                 }
             }
@@ -5695,6 +5695,25 @@ void Table::update_account_bet()
         seats[i].bet = score_from_players_total[i];
     }
 
+    //统计大结算时中鸡数，冲锋鸡数和责任鸡数
+    for (int i=0; i<seat_max; ++i)
+    {
+        if (seats[i].ready != 1)
+            continue;
+        map<int, int>::iterator it = score_to_players_item_count[i].begin();
+        for (; it != score_to_players_item_count[i].end(); ++it)
+        {
+            if (it->first == BEN_JI_TYPE || it->first == YAO_BAI_JI_TYPE || it->first == WU_GU_JI_TYPE || it->first == YAO_JI_TYPE)
+                seats[i].total_zhong_ji++;
+
+            if (it->first == CHONG_FENG_WU_GU_JI_TYPE || it->first == CHONG_FENG_JI_TYPE)
+                seats[i].total_chong_feng_ji++;
+
+            if (it->first == ZE_REN_JI_TYPE)
+                seats[i].total_ze_ren_ji++;
+        }
+    }
+    
     for (int i = 0; i < seat_max; i++)
     {
         Player *player = seats[i].player;

@@ -133,6 +133,9 @@ typedef struct
     int total_an_gang;
     int total_ming_gang;
     int total_zhong_horse;
+    int total_zhong_ji; //这个只计幺鸡、乌骨鸡和翻出来的鸡牌
+    int total_chong_feng_ji;
+    int total_ze_ren_ji;
     int is_bao_ting; //是否为报听
     int lian_zhuang_cnt;//连续作庄
     int jiao_pai;
