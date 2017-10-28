@@ -5380,6 +5380,22 @@ void Table::update_account_bet()
                 {
                     continue;
                 }
+                if (seats[i].has_ze_ren_ji == 1)
+                {
+                    seats[j].score_from_players_detail[i][ZE_REN_JI_TYPE] = 1; //不管输赢，有责任鸡都输出1分
+                    score_from_players_item_count[j][ZE_REN_JI_TYPE] = 1;
+                    score_to_players_item_count[i][ZE_REN_JI_TYPE]++;
+                    mjlog.debug("jipai seats[%d] you ze ren ji.\n", i);
+                }
+                if (seats[i].has_wu_gu_ze_ren_ji == 1)
+                {
+                    seats[j].score_from_players_detail[i][ZE_REN_JI_TYPE] = 1; //不管输赢，有责任鸡都输出1分
+                    score_from_players_item_count[j][ZE_REN_JI_TYPE] = 1;
+                    if (seats[i].has_ze_ren_ji == 1)
+                        score_from_players_item_count[j][ZE_REN_JI_TYPE] = 2;
+                    score_to_players_item_count[i][ZE_REN_JI_TYPE]++;
+                    mjlog.debug("jipai seats[%d] you wu gu ze ren ji.\n", i);
+                }
                 if (j != win_seatid && seats[j].hole_cards.hu_cards.size() <= 0) //胡牌和叫牌的玩家，进分
                 {
                     continue;
@@ -5407,22 +5423,6 @@ void Table::update_account_bet()
                     score_from_players_item_count[j][CHONG_FENG_WU_GU_JI_TYPE] = 1;
                     score_to_players_item_count[i][CHONG_FENG_WU_GU_JI_TYPE]++;
                     mjlog.debug("jipai seats[%d] you chong feng wu gu ji.\n", i);
-                }
-                if (seats[i].has_ze_ren_ji == 1)
-                {
-                    seats[j].score_from_players_detail[i][ZE_REN_JI_TYPE] = 1; //不管输赢，有责任鸡都输出1分
-                    score_from_players_item_count[j][ZE_REN_JI_TYPE] = 1;
-                    score_to_players_item_count[i][ZE_REN_JI_TYPE]++;
-                    mjlog.debug("jipai seats[%d] you ze ren ji.\n", i);
-                }
-                if (seats[i].has_wu_gu_ze_ren_ji == 1)
-                {
-                    seats[j].score_from_players_detail[i][ZE_REN_JI_TYPE] = 1; //不管输赢，有责任鸡都输出1分
-                    score_from_players_item_count[j][ZE_REN_JI_TYPE] = 1;
-                    if (seats[i].has_ze_ren_ji == 1)
-                        score_from_players_item_count[j][ZE_REN_JI_TYPE] = 2;
-                    score_to_players_item_count[i][ZE_REN_JI_TYPE]++;
-                    mjlog.debug("jipai seats[%d] you wu gu ze ren ji.\n", i);
                 }
                 if (seats[i].has_yao_ji >= 1)
                 {
