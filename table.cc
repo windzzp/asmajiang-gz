@@ -136,7 +136,7 @@ int Table::init(int my_tid, int my_vid, int my_zid, int my_type, float my_fee,
     seat_max = 4;
     max_play_board = 4;
     round_count = 0;
-
+    fang_8_tong = 0;
     cur_players = 0;
     players.clear();
     ready_players = 0;
@@ -220,6 +220,7 @@ void Table::init_table_type(int set_type, int set_has_ghost, int set_has_feng, i
         seats[i].lian_zhuang_cnt = 1; //连续作庄
         seats[i].jiao_pai = 0;
     }
+    fang_8_tong = 0;
     forbid_same_ip = set_forbid_same_ip;
     forbid_same_place = set_forbid_same_place;
     ben_ji = set_ben_ji;
@@ -315,7 +316,7 @@ void Table::reset()
     forbid_hu_record.clear();
     ahead_start_flag = 0;
     ahead_start_uid = -1;
-
+    fang_8_tong = 0;
     horse_num = 1;
     is_re_pao = 0;
     is_qiang_gang = 0;
@@ -5015,7 +5016,8 @@ void Table::update_account_bet()
             }
             else if (ji.value == 2 * 16 + 8 && (wu_gu_ji == 1))
             {
-                ji_pai[1].type = BEN_JI;
+                fang_8_tong = 1;
+                // ji_pai[1].type = BEN_JI;
                 mjlog.debug("jipai has jin ji[wu gu ji]\n", ji.value);
             }
             else
@@ -5043,7 +5045,8 @@ void Table::update_account_bet()
         }
         else if (ji1.value == 2 * 16 + 8 && (wu_gu_ji == 1) )
         {
-            ji_pai[1].type = YAO_BAI_JI;
+            fang_8_tong = 1;
+            // ji_pai[1].type = YAO_BAI_JI;
             mjlog.debug("jipai has jin ji[wu gu ji]\n", ji1.value);
         }
         else
@@ -5068,7 +5071,8 @@ void Table::update_account_bet()
         }
         else if (ji2.value == 2 * 16 + 8 && (wu_gu_ji == 1) )
         {
-            ji_pai[1].type = YAO_BAI_JI;
+            fang_8_tong = 1;
+            // ji_pai[1].type = YAO_BAI_JI;
             mjlog.debug("jipai has jin ji[wu gu ji]\n", ji2.value);
         }
         else
@@ -5128,11 +5132,23 @@ void Table::update_account_bet()
             }
 
             //查看打出去的牌
+            bool dec_chong_feng_ji = false;
+            bool dec_chong_feng_wu_gu_ji = false;
             std::list<Card>::iterator ite = seats[j].hole_cards.discard_cards.begin();
             for (; ite != seats[j].hole_cards.discard_cards.end(); ++ite)
             {
                 if (ite->value == ji_pai[i].value)
                 {
+                    if (ite->value == 1 && dec_chong_feng_ji == false && seats[j].has_chong_feng_ji == 1)
+                    {
+                        dec_chong_feng_ji = true;
+                        continue;
+                    }
+                    if (ite->value == 2 * 16 + 8 && dec_chong_feng_wu_gu_ji == false && wu_gu_ji == 1 && seats[j].has_chong_feng_wu_gu_ji)
+                    {
+                        dec_chong_feng_wu_gu_ji = true;
+                        continue;
+                    }
                     seats[j].ji_pai.push_back(ji_pai[i]);
                     seats[j].horse_count++;
                 }
@@ -5247,9 +5263,9 @@ void Table::update_account_bet()
                     mjlog.debug("BEN JI seatsid[%d] win %d seatsid[%d] lose\n", i, BEN_JI_BET, k);
                     break;
                 case WU_GU_JI:
-                    seats[i].score_from_players_detail[k][WU_GU_JI_TYPE] += WU_GU_JI_BET;
+                    seats[i].score_from_players_detail[k][WU_GU_JI_TYPE] += WU_GU_JI_BET * (fang_8_tong + 1);
                     score_to_players_item_count[k][WU_GU_JI_TYPE]++;
-                    mjlog.debug("WU_GU_JI seatsid[%d] win %d seatsid[%d] lose\n", i, WU_GU_JI_BET, k);
+                    mjlog.debug("WU_GU_JI seatsid[%d] win %d seatsid[%d] lose\n", i, WU_GU_JI_BET * (fang_8_tong + 1), k);
                     break;
                 case YAO_JI:
                     seats[i].score_from_players_detail[k][YAO_JI_TYPE] += YAO_JI_BET;
