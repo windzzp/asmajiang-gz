@@ -343,7 +343,7 @@ public:
 
 	int 						ts;
     int                         round_ts;
-
+    int                         fang_8_tong;
     ev_timer                    preready_timer;
     ev_tstamp                   preready_timer_stamp;	
 
@@ -451,7 +451,6 @@ public:
     int                         ben_ji;
     int                         wu_gu_ji;
     int                         bao_ji;
-
     int                         is_re_pao; //是否为热炮
     int                         is_qiang_gang; //是否为抢杠
     int                         is_huang_zhuang; //是否为黄庄
