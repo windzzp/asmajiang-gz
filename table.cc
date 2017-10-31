@@ -805,8 +805,8 @@ int Table::handler_table_info(Player *player)
                         }
                     }
 
-                    if (actions[NOTICE_TING] == 1)
-                    {
+                    // if (actions[NOTICE_TING] == 1)
+                    // {
                         int index = 0;
                         std::map<int, vector<Card> >::iterator it = seat.hole_cards.ting_cards.begin();
                         for (; it != seat.hole_cards.ting_cards.end(); it++)
@@ -819,7 +819,7 @@ int Table::handler_table_info(Player *player)
                             }
                             index++;
                         }
-                    }
+                    // }
 
                     if (actions[NOTICE_CHI] == 1)
                     {
@@ -1451,8 +1451,8 @@ int Table::start_next_bet(int flag)
         }
     }
 
-    if (actions[NOTICE_TING] == 1)
-    {
+    // if (actions[NOTICE_TING] == 1)
+    // {
         int index = 0;
         std::map<int, vector<Card> >::iterator it = seat.hole_cards.ting_cards.begin();
         for (; it != seat.hole_cards.ting_cards.end(); it++)
@@ -1465,7 +1465,7 @@ int Table::start_next_bet(int flag)
             }
             index++;
         }
-    }
+    // }
 
     packet.end();
     unicast(seat.player, packet.tostring());
@@ -4641,7 +4641,7 @@ int Table::calculate_base_score(int sid, int pao, int card_value)
                 score += 10;
         // }
     }
-    else if (seat.get_next_card_cnt == 1 && seat.hole_cards.size() >= 13 && cur_seat == sid)
+    else if (seat.get_next_card_cnt == 1 && seat.hole_cards.size() >= 13 && gang_hu_seat < 0 && pao_hu_seat < 0)
     {
         // if (chi_count == 0 && peng_count == 0 && gang_count == 0)
         // {
@@ -5986,22 +5986,30 @@ string Table::format_card_desc(int card_type, int seatid)
 
         if (lian_gang_flag == 1)
         {
-            str_special = "连杠杠上花, ";
+            str_special += "连杠杠上花, ";
         }
 
         if (lian_gang_pao_flag == 1)
         {
-            str_special = "连杠杠上炮, ";
+            str_special += "连杠杠上炮, ";
         }
 
         if (seats[seatid].is_bao_ting)
         {
-            str_special = "报听, ";
+            str_special += "报听, ";
         }
         if (sha_bao)
         {
-            str_special = "杀报, ";
+            str_special += "杀报, ";
         }
+        // if (is_re_pao)
+        // {
+        //     str_special += "热炮, ";
+        // }
+        // if (is_qiang_gang)
+        // {
+        //     str_special += "抢杠, ";
+        // }
     }
 
     if (seatid >= 0 && seatid < seat_max)
@@ -6981,7 +6989,7 @@ void Table::huang_zhuang_cha_jiao()
             //没有听牌的玩家，给这个玩家相应的分値
             for (int j = 0; j < seat_max; j++)
             {
-                if (seats[j].ready != 1)
+                if (seats[j].ready != 1 || i == j)
                 {
                     continue;
                 }
