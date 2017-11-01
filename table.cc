@@ -1321,7 +1321,7 @@ int Table::start_next_bet(int flag)
                     seat.gang_count[3] == 0 &&                        //没有转弯豆（碰杠）是不能胡牌
                     seats[chu_seat].last_actions[1] != PLAYER_GANG && //如果被胡玩家之前的操作是杠,则杠之后出的牌是可以不用碰杠也可以胡
                     seats[chu_seat].last_actions[0] != PLAYER_GANG    //如果被胡玩家的当前操作是碰杠，则这个杠可以被抢胡，不需要碰杠也可以胡
-                    && (seat.get_next_card_cnt == 0 ) 
+                    && (seat.get_next_card_cnt != 0 ) 
                     )
                 {
                     mjlog.debug("mei you zhuang wan dou\n");
@@ -2444,7 +2444,7 @@ int Table::next_player_seat()
                     seat.gang_count[3] == 0 &&                        //没有转弯豆（碰杠）是不能胡牌
                     seats[chu_seat].last_actions[1] != PLAYER_GANG && //如果被胡玩家之前的操作是杠,则杠之后出的牌是可以不用碰杠也可以胡
                     seats[chu_seat].last_actions[0] != PLAYER_GANG    //如果被胡玩家的当前操作是碰杠，则这个杠可以被抢胡，不需要碰杠也可以胡
-                    && (seat.get_next_card_cnt == 0 )   //地胡是可以直接胡的，不需要转弯豆
+                    && (seat.get_next_card_cnt != 0 )   //地胡是可以直接胡的，不需要转弯豆
                     )
                 {
                     mjlog.debug("mei you zhuang wan dou\n");
@@ -5373,7 +5373,10 @@ void Table::update_account_bet()
                 }
                 if (seats[i].has_wu_gu_ze_ren_ji == 1)
                 {
-                    seats[j].score_from_players_detail[i][ZE_REN_JI_TYPE] = 1; //不管输赢，有责任鸡都输出1分
+                    if (seats[j].score_from_players_detail[i][ZE_REN_JI_TYPE] == 1)
+                        seats[j].score_from_players_detail[i][ZE_REN_JI_TYPE] = 2; //不管输赢，有责任鸡都输出1分
+                    else
+                        seats[j].score_from_players_detail[i][ZE_REN_JI_TYPE] = 1;
                     score_from_players_item_count[j][ZE_REN_JI_TYPE] = 1;
                     if (seats[i].has_ze_ren_ji == 1)
                         score_from_players_item_count[j][ZE_REN_JI_TYPE] = 2;
@@ -5415,7 +5418,10 @@ void Table::update_account_bet()
                 }
                 if (seats[i].has_wu_gu_ze_ren_ji == 1)
                 {
-                    seats[j].score_from_players_detail[i][ZE_REN_JI_TYPE] = 1; //不管输赢，有责任鸡都输出1分
+                    if (seats[j].score_from_players_detail[i][ZE_REN_JI_TYPE] == 1)
+                        seats[j].score_from_players_detail[i][ZE_REN_JI_TYPE] = 2; //不管输赢，有责任鸡都输出1分
+                    else
+                        seats[j].score_from_players_detail[i][ZE_REN_JI_TYPE] = 1;
                     score_from_players_item_count[j][ZE_REN_JI_TYPE] = 1;
                     if (seats[i].has_ze_ren_ji == 1)
                         score_from_players_item_count[j][ZE_REN_JI_TYPE] = 2;
