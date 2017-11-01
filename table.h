@@ -469,7 +469,10 @@ public:
 
     std::map<int, std::map<int, int> > score_to_players_item_total; //每个玩家的每项输出得分。
     std::map<int, std::map<int, int> > score_to_players_item_count; //每个玩家的某种类型牌分次数。
-
+    int fang_ben_ji;
+    int fang_fang_ji;
+    int fang_yao_bai_ji1;
+    int fang_yao_bai_ji2;
 	
 	int							cost_select_flag;		//付费选择标记
 	std::vector<int>            redpackes;

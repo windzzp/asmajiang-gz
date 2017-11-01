@@ -225,6 +225,10 @@ void Table::init_table_type(int set_type, int set_has_ghost, int set_has_feng, i
     forbid_same_place = set_forbid_same_place;
     ben_ji = set_ben_ji;
     wu_gu_ji = set_wu_gu_ji;
+    fang_ben_ji = 0;
+    fang_fang_ji = 0;
+    fang_yao_bai_ji1 = 0;
+    fang_yao_bai_ji2 = 0;
     bao_ji = set_bao_ji;
     already_update_account_bet = 0;
     sha_bao = 0;
@@ -304,7 +308,10 @@ void Table::reset()
     gang_shang_hua_seat = -1;
     lian_gang_flag = 0;
     lian_gang_pao_flag = 0;
-
+    fang_ben_ji = 0;
+    fang_fang_ji = 0;
+    fang_yao_bai_ji1 = 0;
+    fang_yao_bai_ji2 = 0;
     chi_count = 0;
     peng_count = 0;
     horse_count = 0;
@@ -1314,6 +1321,7 @@ int Table::start_next_bet(int flag)
                     seat.gang_count[3] == 0 &&                        //没有转弯豆（碰杠）是不能胡牌
                     seats[chu_seat].last_actions[1] != PLAYER_GANG && //如果被胡玩家之前的操作是杠,则杠之后出的牌是可以不用碰杠也可以胡
                     seats[chu_seat].last_actions[0] != PLAYER_GANG    //如果被胡玩家的当前操作是碰杠，则这个杠可以被抢胡，不需要碰杠也可以胡
+                    && (seat.get_next_card_cnt == 0 ) 
                     )
                 {
                     mjlog.debug("mei you zhuang wan dou\n");
@@ -2436,6 +2444,7 @@ int Table::next_player_seat()
                     seat.gang_count[3] == 0 &&                        //没有转弯豆（碰杠）是不能胡牌
                     seats[chu_seat].last_actions[1] != PLAYER_GANG && //如果被胡玩家之前的操作是杠,则杠之后出的牌是可以不用碰杠也可以胡
                     seats[chu_seat].last_actions[0] != PLAYER_GANG    //如果被胡玩家的当前操作是碰杠，则这个杠可以被抢胡，不需要碰杠也可以胡
+                    && (seat.get_next_card_cnt == 0 )   //地胡是可以直接胡的，不需要转弯豆
                     )
                 {
                     mjlog.debug("mei you zhuang wan dou\n");
@@ -3660,7 +3669,7 @@ int Table::handler_hu(Player *player)
     seat.actions.push_front(action);
 
     //被胡玩家出牌之前的操作是杠,则是热炮牌型。
-    if (seats[chu_seat].last_actions[1] == PLAYER_GANG && seats[chu_seat].last_actions[0] == PLAYER_CHU)
+    if (seats[chu_seat].last_actions[1] == PLAYER_GANG && seats[chu_seat].last_actions[0] == PLAYER_CHU && (pao_hu_seat >= 0 || gang_hu_seat >= 0))
     {
         is_re_pao = 1;
         mjlog.debug("handler_hu is re pao\n");
@@ -4572,7 +4581,7 @@ int Table::calculate_base_score(int sid, int pao, int card_value)
         break;
     case CARD_TYPE_QING_LONG_QI_DUI: // 清龙七对
         score = 30;
-        seat.hu_pai_lei_xing = "青龙七对";
+        seat.hu_pai_lei_xing = "清龙七对";
         break;
     default:
         score = 1;
@@ -4641,7 +4650,7 @@ int Table::calculate_base_score(int sid, int pao, int card_value)
                 score += 10;
         // }
     }
-    else if (seat.get_next_card_cnt == 1 && seat.hole_cards.size() >= 13 && gang_hu_seat < 0 && pao_hu_seat < 0)
+    else if (seat.get_next_card_cnt == 1 && seat.hole_cards.size() >= 13 && gang_hu_seat < 0 && pao_hu_seat < 0 && sid != dealer )
     {
         // if (chi_count == 0 && peng_count == 0 && gang_count == 0)
         // {
@@ -5009,6 +5018,7 @@ void Table::update_account_bet()
         {
             ji_data ji;
             ji.value = deck.horse_cards[i].value;
+            fang_ben_ji = ji.value;
             if (ji.value == 1)
             {
                 ji_pai[0].type = BEN_JI;
@@ -5037,7 +5047,7 @@ void Table::update_account_bet()
         {
             ji1.value = deck.horse_cards[i].value + 8;
         }
-
+        fang_yao_bai_ji1 = ji1.value;
         if (ji1.value == 1)
         {
             ji_pai[0].type = YAO_BAI_JI;
@@ -5063,7 +5073,7 @@ void Table::update_account_bet()
         {
             ji2.value = deck.horse_cards[i].value - 8;
         }
-
+        fang_yao_bai_ji2 = ji2.value;
         if (ji2.value == 1)
         {
             ji_pai[0].type = YAO_BAI_JI;
@@ -7108,13 +7118,33 @@ void Table::ji_game_end()
     update_account_bet();
 	Jpacket packet;
     packet.val["cmd"] = SERVER_DISPLAY_JI_CARD_SUIT_SUCC_BC;
-    for (unsigned int i = 0; i < ji_pai.size(); ++i)
+    // for (unsigned int i = 0; i < ji_pai.size(); ++i)
+    // {
+    //     if (ji_pai[i].type == BEN_JI || ji_pai[i].type == YAO_BAI_JI)
+    //     {
+    //         packet.val["value"].append(ji_pai[i].value);
+    //         packet.val["type"].append(ji_pai[i].type);
+    //     }
+    // }
+    if (fang_ben_ji != 0)
     {
-        if (ji_pai[i].type == BEN_JI || ji_pai[i].type == YAO_BAI_JI)
-        {
-            packet.val["value"].append(ji_pai[i].value);
-            packet.val["type"].append(ji_pai[i].type);
-        }
+        packet.val["value"].append(fang_ben_ji);
+        packet.val["type"].append(BEN_JI);
+    }
+    // if (fang_fang_ji != 0)
+    // {
+    //     packet.val["value"].append(fang_fang_ji);
+    //     packet.val["type"].append(FANG_JI);
+    // }
+    if (fang_yao_bai_ji1 != 0)
+    {
+        packet.val["value"].append(fang_yao_bai_ji1);
+        packet.val["type"].append(YAO_BAI_JI);
+    }
+    if (fang_yao_bai_ji1 != 0)
+    {
+        packet.val["value"].append(fang_yao_bai_ji2);
+        packet.val["type"].append(YAO_BAI_JI);
     }
 	packet.end();
     broadcast(NULL, packet.tostring());
