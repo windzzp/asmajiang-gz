@@ -2742,12 +2742,12 @@ void Table::init_dealer()
             if (seats[i].uid == owner_uid)
             {
                 dealer = i;
-                seats[dealer].lian_zhuang_cnt = 2;
+                seats[dealer].lian_zhuang_cnt = 1;
                 return;
             }
         }
         dealer = random_dealer();
-        seats[dealer].lian_zhuang_cnt = 2;
+        seats[dealer].lian_zhuang_cnt = 1;
         return;
     }
 
@@ -5387,7 +5387,7 @@ void Table::update_account_bet()
         }
     }
 
-    if (bao_ji)
+    if (bao_ji && !is_re_pao && !is_qiang_gang)
     { //在包鸡的情况下，没有叫牌和胡牌的玩家，打出去的冲锋鸡，冲锋乌骨鸡，幺鸡，乌骨鸡要出分
         for (int i = 0; i < seat_max; i++)
         { //根据玩家手中的鸡牌，算bet值
