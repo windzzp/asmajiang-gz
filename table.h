@@ -480,6 +480,7 @@ public:
 
     int already_update_account_bet;
     int sha_bao;
+    int fang_card;
     Json::Value                 config_of_replay;  //配置
 public:
     Table();

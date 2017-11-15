@@ -232,6 +232,7 @@ void Table::init_table_type(int set_type, int set_has_ghost, int set_has_feng, i
     bao_ji = set_bao_ji;
     already_update_account_bet = 0;
     sha_bao = 0;
+    fang_card = 0;
     deck.init(has_feng, has_ghost, horse_num, hu_pair, 0);
 }
 
@@ -344,6 +345,7 @@ void Table::reset()
     score_to_players_item_total.clear();
     already_update_account_bet = 0;
     sha_bao = 0;
+    fang_card = 0;
 }
 void Table::vector_to_json_array(std::vector<ji_data> &cards, Json::Value &val, string key, string key2)
 {
@@ -1435,12 +1437,12 @@ int Table::start_next_bet(int flag)
                     // handler = 1;
                 }
             }
-            // 最后一张不允许杠
-            if (seat.hole_cards.permit_gang() && handler == 0 && deck.permit_get() == 1 && last_action != PLAYER_PENG)
-            {
-                actions[NOTICE_GANG] = 1;
-                actions[NOTICE_GUO] = 1;
-            }
+        }
+        // 最后一张不允许杠
+        if (seat.hole_cards.permit_gang() && handler == 0 && deck.permit_get() == 1 && last_action != PLAYER_PENG)
+        {
+            actions[NOTICE_GANG] = 1;
+            actions[NOTICE_GUO] = 1;
         }
     }
 
@@ -5014,6 +5016,7 @@ void Table::update_account_bet()
     for (unsigned int i = 0; i < deck.horse_cards.size(); i++) //鸡牌一般就翻一个鸡牌，这里写循环以后兼容多个
     {
         //本鸡
+        fang_card = deck.horse_cards[i].value;
         if (ben_ji == 1)
         {
             ji_data ji;
@@ -7132,6 +7135,7 @@ void Table::ji_game_end()
     //         packet.val["type"].append(ji_pai[i].type);
     //     }
     // }
+    packet.val["fang_card"] = fang_card;
     if (fang_ben_ji != 0)
     {
         packet.val["value"].append(fang_ben_ji);
