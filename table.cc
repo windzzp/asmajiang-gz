@@ -48,7 +48,7 @@ extern Log mjlog;
 
 #define SUBS_TIME_OUT 108000
 
-#define JI_CARD_TIME_OUT 1 
+#define JI_CARD_TIME_OUT 3 
 
 Table::Table() : preready_timer_stamp(PREREADY_TIME_OUT),
                  ready_timer_stamp(READY_TIME_OUT),
@@ -1439,7 +1439,7 @@ int Table::start_next_bet(int flag)
             }
         }
         // 最后一张不允许杠
-        if (seat.hole_cards.permit_gang() && handler == 0 && deck.permit_get() == 1 && last_action != PLAYER_PENG)
+        if (seat.ting != 1 && seat.hole_cards.permit_gang() && handler == 0 && deck.permit_get() == 1 && last_action != PLAYER_PENG)
         {
             actions[NOTICE_GANG] = 1;
             actions[NOTICE_GUO] = 1;
@@ -5115,11 +5115,11 @@ void Table::update_account_bet()
         {
             continue;
         }
-        if (bao_ji != 1) //在非包鸡情况下，只有赢牌玩家才算鸡分
-        {
-            if (j != win_seatid)
-                continue;
-        }
+        // if (bao_ji != 1) //在非包鸡情况下，只有赢牌玩家才算鸡分
+        // {
+        //     if (j != win_seatid)
+        //         continue;
+        // }
 
         if ( j == win_seatid || seats[j].pao_hu_flag == 1 || seats[j].gang_hu_flag == 1)
         { //最后胡的那张牌，加入玩家的手牌
@@ -5217,11 +5217,11 @@ void Table::update_account_bet()
         {
             continue;
         }
-        if (bao_ji != 1) //在非包鸡情况下，只有赢牌玩家才算鸡分
-        {
-            if (i != win_seatid)
-                continue;
-        }
+        // if (bao_ji != 1) //在非包鸡情况下，只有赢牌玩家才算鸡分
+        // {
+        //     if (i != win_seatid)
+        //         continue;
+        // }
         for (int j = 0; j < seats[i].horse_count; ++j)
         {
 
