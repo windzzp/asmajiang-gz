@@ -182,7 +182,15 @@ typedef struct
         robot_flag = 0;
         timeout_count = 0;
         dismiss = 0;
-
+        total_zimo = 0;
+        total_fang_pao = 0;
+        total_jie_pao = 0;
+        total_an_gang = 0;
+        total_ming_gang = 0;
+        total_zhong_horse = 0;
+        total_zhong_ji = 0;
+        total_chong_feng_ji = 0;
+        total_ze_ren_ji = 0;
         for (int i = 0; i < 4; i++)
         {
             gang_count[i] = 0;
