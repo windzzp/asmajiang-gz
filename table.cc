@@ -48,7 +48,7 @@ extern Log mjlog;
 
 #define SUBS_TIME_OUT 108000
 
-#define JI_CARD_TIME_OUT 3 
+#define JI_CARD_TIME_OUT 1 
 
 Table::Table() : preready_timer_stamp(PREREADY_TIME_OUT),
                  ready_timer_stamp(READY_TIME_OUT),
@@ -2667,7 +2667,7 @@ int Table::get_last_betting()
 		 70、注册 71、登录领奖 72、破产领取 73、参拜财神 74、充值抽奖 75、领取邮件礼物 76、发送邮件礼物
 		 77、玩N局奖励  78、领取任务奖励
 */
-int Table::insert_flow_log(int ts, int uid, string ip, int pos, int vid, int zid, int tid, int type, int flag, int num, int anum)
+int Table::insert_flow_log(int flag)
 {
     Jpacket packet;
     packet.val["roomid"] = ttid;
@@ -2699,6 +2699,9 @@ int Table::insert_flow_log(int ts, int uid, string ip, int pos, int vid, int zid
         case 2:
             packet.val["player3"] = occ == 1 ? player->uid : 0;
             break;
+        case 3:
+            packet.val["player4"] = occ == 1 ? player->uid : 0;
+            break;
         default:
             break;
         }
@@ -2706,8 +2709,14 @@ int Table::insert_flow_log(int ts, int uid, string ip, int pos, int vid, int zid
         index++;
     }
 
-    packet.val["rmb"] = num;
+    packet.val["rmb"] = create_rmb;
     packet.val["vid"] = type;
+    // packet.val["club_id"] = clubid;
+    // packet.val["club_rmb_cost"] = rmb_cost;
+    // packet.val["auto_flag"] = auto_flag;
+    packet.val["cost_select_flag"] = cost_select_flag;
+    packet.val["substitute"] = substitute;
+    packet.val["deduct_flag"] = flag;
     packet.val["ts"] = (int)time(NULL);
 
     string str = packet.val.toStyledString().c_str();
@@ -2718,7 +2727,7 @@ int Table::insert_flow_log(int ts, int uid, string ip, int pos, int vid, int zid
         mjlog.error("insert rmb_flow_record %s", str.c_str());
         return -1;
     }
-    return 0;
+	return 0;
 }
 
 int Table::handler_send_gift_req(Player *player)
@@ -4035,8 +4044,8 @@ int Table::handler_dismiss_table(Player *player)
                 if (players.find(origin_owner_uid) != players.end())
                 {
                     players[origin_owner_uid]->incr_rmb(create_rmb * ratio);
-                    Player *player1 = players[origin_owner_uid];
-                    insert_flow_log((int)time(NULL), player1->uid, player1->remote_ip, 0, type, zid, ttid, type, 1, 1 * ratio, player1->rmb);
+                    // Player *player1 = players[origin_owner_uid];
+                    insert_flow_log(0);
                 }
             }
 
@@ -4156,17 +4165,13 @@ void Table::clean_table()
     {
         Player::incr_rmb(owner_uid, create_rmb);
         zjh.game->del_subs_table(owner_uid);
+        insert_flow_log(0);
     }
 
     if (round_count > 0)
     {
         if (!transfer_flag && substitute != 1)
         {
-            /*
-            players[owner_uid]->incr_rmb(0 - create_rmb * ratio);
-            Player* player = players[owner_uid];
-            insert_flow_log((int)time(NULL), player->uid, player->remote_ip, 0, type, zid, ttid, type, 0, 1 * ratio, player->rmb);
-            */
             create_table_cost();
         }
 
@@ -4610,7 +4615,7 @@ int Table::calculate_base_score(int sid, int pao, int card_value)
     { //自摸
         for (int i = 0; i < seat_max; i++)
         {
-            if (seats[i].occupied == 0 || i == sid)
+            if (seats[i].occupied == 0 || i == sid || i == win_seatid)
             {
                 continue;
             }
@@ -6249,8 +6254,8 @@ int Table::handler_transfer_owner_req(Player *player)
     if (!transfer_flag)
     {
         players[origin_owner_uid]->incr_rmb(0 - create_rmb);
-        Player *player1 = players[origin_owner_uid];
-        insert_flow_log((int)time(NULL), player1->uid, player1->remote_ip, 0, type, zid, ttid, type, 0, create_rmb, player1->rmb);
+        // Player *player1 = players[origin_owner_uid];
+        insert_flow_log(1);
     }
 
     Jpacket packet;
@@ -6749,6 +6754,7 @@ void Table::handler_substitute_req(Player *player)
     owner_name = player->name;
 
     player->incr_rmb(0 - create_rmb);
+    insert_flow_log(1);
 
     char buff[128] = {
         0,
@@ -6900,8 +6906,8 @@ void Table::create_table_cost() //创建房间扣费函数
         mjlog.debug("create_table_cost cost_select_flag [%d] uid[%d] create_rmb[%d]\n",
                     cost_select_flag, owner_uid, create_rmb);
         players[owner_uid]->incr_rmb(0 - create_rmb);
-        Player *player = players[owner_uid];
-        insert_flow_log((int)time(NULL), player->uid, player->remote_ip, 0, type, zid, ttid, type, 0, create_rmb, player->rmb);
+        // Player *player = players[owner_uid];
+        insert_flow_log(1);
     }
     else if (cost_select_flag == 2) //AA扣费
     {
@@ -6912,7 +6918,7 @@ void Table::create_table_cost() //创建房间扣费函数
                 mjlog.debug("create_table_cost cost_select_flag [%d] uid[%d] create_rmb[%d]\n",
                             cost_select_flag, seats[i].player->uid, create_rmb);
                 seats[i].player->incr_rmb(0 - create_rmb);
-                insert_flow_log((int)time(NULL), seats[i].player->uid, seats[i].player->remote_ip, 0, type, zid, ttid, type, 0, create_rmb, seats[i].player->rmb);
+                insert_flow_log(1);
             }
         }
     }

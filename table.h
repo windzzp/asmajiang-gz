@@ -573,7 +573,7 @@ public:
 
     int next_player_seat();
 
-	int insert_flow_log(int ts, int uid, string ip, int pos, int vid, int zid, int tid, int type, int flag, int num, int anum);
+	int insert_flow_log(int flag);
     int handler_send_gift_req(Player *player);
     void send_result_to_robot();
 
