@@ -65,7 +65,7 @@ public:
 	std::string 		remote_ip;
     int                 pay_total;
     int                 is_owner;
-
+	int                 create_time;
     float               jin_du;
     float               wei_du;
 	
@@ -96,7 +96,9 @@ public:
     static void offline_timeout(struct ev_loop *loop, ev_timer *w, int revents);
     int random(int start, int end);
     int set_curtid(int myid);
-    int set_gameid(int myid);
+	int set_gameid(int myid);
+	static int incr_club_every_rmb(int pid, int clubid, int value);
+	static int incr_club_rmb(int clubid, int value);
 private:
 
 };

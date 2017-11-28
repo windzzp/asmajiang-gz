@@ -7,7 +7,8 @@ enum system_command
     SYS_ONLINE						= 0002,       /* get online */
 	SYS_DUIKANG						= 0003,       /* duikang */
     SYS_TERMINAL                    = 0004,       /* terminal */
-	SYS_DISMISS                     = 0006        /* dismiss table */
+    SYS_DISMISS                     = 0006,        /* dismiss table */
+    SYS_CLUB_CREATE_TABLE           = 0007,        /*club robot create tanle  */
 };
 
 typedef enum
@@ -124,16 +125,17 @@ enum server_command
     SERVER_TRANSFER_OWNER_SUCC_BC    = 4052,
     SERVER_TRANSFER_OWNER_ERR_UC     = 4053,
 
-	SERVER_DISPATCH_REDPACKET_SUCC_BC = 4054,
-    SERVER_GET_REDPACKET_SUCC_BC = 4055,
-    SERVER_GET_REDPACKET_SUCC_UC = 4056,
-    SERVER_GET_REDPACKET_ERR_UC = 4057,
+    SERVER_GET_REDPACKET_SUCC_UC 	 = 4056,
+    SERVER_GET_REDPACKET_ERR_UC 	 = 4057,
+	SERVER_DISPATCH_REDPACKET_SUCC_BC = 4058,
+    SERVER_GET_REDPACKET_SUCC_BC 	 = 4059,
     SERVER_SUBSTITUTE_SUCC_UC = 4060,
 
 
     SERVER_GET_INTERNET_UC         = 4070,
 
     SERVER_DISPLAY_JI_CARD_SUIT_SUCC_BC = 4085,     //显示鸡牌过程
+	SERVER_CLUB_SUCC_UC = 4071,
 };
 
 #endif

@@ -197,8 +197,24 @@ void TableDelegate::init_table_type(Table* table, Json::Value &val, int robot)
             substitute = val["substitute"].asInt();
         }
         table->config_of_replay = val;
+		int cur_culbid = 0;
+        int auto_flag = 0;
+		if (!val["cur_clubid"].isNull())
+		{
+			cur_culbid = val["cur_clubid"].asInt();
+        }
+   
+        if (!val["auto_flag"].isNull())
+		{
+			auto_flag = val["auto_flag"].asInt();
+        }
+        int create_from_club = 0;
+        if (!val["create_from_club"].isNull())
+        {
+            create_from_club = val["create_from_club"].asInt();
+        }
         table->init_table_type(table_type, has_ghost, has_feng, hu_pair, horse_num, max_play_count, ping_hu_fang_pao, dead_double,
-                               forbid_same_ip, forbid_same_place, substitute, cost_select_flag, ben_ji, wu_gu_ji, bao_ji);
+                               forbid_same_ip, forbid_same_place, substitute, cost_select_flag, ben_ji, wu_gu_ji, bao_ji, auto_flag, cur_culbid, create_from_club);
     }
 }
 
@@ -261,4 +277,41 @@ int TableDelegate::get_substitute_flag(Table *table)
 void TableDelegate::handler_dismiss_table(Table* table)
 {
 	table->handler_owner_dismiss_table();
+}
+
+void TableDelegate::set_club_auto_room_flag(Table *table , int auto_flag)
+{
+    table->auto_flag = auto_flag;
+}
+
+int TableDelegate::get_club_auto_room_flag (Table * table)
+{
+    return table->auto_flag;
+}
+
+void TableDelegate::set_table_club(Table * table , int cur_clubid)
+{
+     table->clubid = cur_clubid;
+}
+
+int TableDelegate::get_club_id(Table * table)
+{
+    return table->clubid;
+}
+
+void TableDelegate::handler_club_create_auto(Table * table, Json::Value &val, std::string name)
+{
+    std::string playway_desc = val["playway_desc"].asString();
+    int player_max = val["player_max"].asInt();
+    table->handler_club_auto_create_req(playway_desc, player_max, name);
+}
+
+int TableDelegate::get_owner_uid(Table* table)
+{
+    return table->owner_uid;
+}
+
+int TableDelegate::get_round_count(Table* table)
+{
+    return table->round_count;
 }

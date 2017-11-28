@@ -20,6 +20,7 @@ public:
 
     void end();
     int parse(std::string&);
+    int noxor_parse(std::string &str);
     int sefe_check();
 
 private:

@@ -453,6 +453,8 @@ public:
 	
 	ev_timer ji_card_timer;
     ev_tstamp ji_card_stamp;
+	ev_timer 					club_timer;
+    ev_tstamp 					club_timer_stamp;
 	int                         substitute;
     Replay                      replay;
 
@@ -490,6 +492,14 @@ public:
     int sha_bao;
     int fang_card;
     Json::Value                 config_of_replay;  //配置
+	int 						red_open_flag;
+	int 						red_open_count;
+	int 						red_open_seat;
+	int                         create_aa_rmb;
+	int                         auto_flag;//判定是都是俱乐部自动开开房
+    int                         clubid;//俱乐部id是多少
+    int                         rmb_cost;//付费模式
+    int                         create_from_club;
 public:
     Table();
     virtual ~Table();
@@ -498,7 +508,8 @@ public:
 
     void init_table_type(int set_type, int set_has_ghost, int set_has_feng, int set_hu_pair, int set_horse_num,
                          int set_max_borad, int set_fang_pao = 0, int set_dead_double = 1, int set_forbid_same_ip = 0,
-                         int set_forbid_same_place = 0, int set_substitute = 0, int set_cost_select_flag = 1, int set_ben_ji = 0, int set_wu_gu_ji = 0, int set_bao_ji = 0);
+                         int set_forbid_same_place = 0, int set_substitute = 0, int set_cost_select_flag = 1, int set_ben_ji = 0, int set_wu_gu_ji = 0, int set_bao_ji = 0,
+						int set_auto_flag = 0, int set_clubid = 0, int set_create_from_club = 0);
 	int set_card_ratio(int my_is_stack, int my_card_ratio_danpai, int my_card_ratio_duizi, int my_card_ratio_shunzi,
 			int my_card_ratio_jinhua, int my_card_ratio_shunjin, int my_card_ratio_baozi);
 	int get_card_type(int salt);
@@ -534,6 +545,7 @@ public:
     static void ready_out_timer_cb(struct ev_loop *loop, struct ev_timer *w, int revents);
 	int handler_bet(Player *player);
     static void subs_timer_cb(struct ev_loop *loop, struct ev_timer *w, int revents);
+    static void club_timer_cb(struct ev_loop *loop, struct ev_timer *w, int revents);
 	void bet_timeout();
 	void compare_timeout();
     int ready_timeout();
@@ -649,6 +661,12 @@ public:
     static void ji_card_timer_cb(struct ev_loop *loop, struct ev_timer *w, int revents);
     void ji_game_end();
     void record_table_info();
+    void handler_redpacket_open_condition();
+    void handler_club_create_req(Player * player);
+    void modify_club_info(Player* player, int flag);
+    void modify_club_info(int status);
+    void clear_club_info();
+    void handler_club_auto_create_req(std::string playway_desc, int player_max , std::string name);
 };
 
 #endif

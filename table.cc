@@ -49,7 +49,7 @@ extern Log mjlog;
 #define SUBS_TIME_OUT 108000
 
 #define JI_CARD_TIME_OUT 1 
-
+#define CLUB_TIME_OUT 10800
 Table::Table() : preready_timer_stamp(PREREADY_TIME_OUT),
                  ready_timer_stamp(READY_TIME_OUT),
                  start_timer_stamp(START_TIME_OUT),
@@ -57,7 +57,8 @@ Table::Table() : preready_timer_stamp(PREREADY_TIME_OUT),
                  compare_timer_stamp(COMPARE_TIME_OUT),
                  dismiss_timer_stamp(DISMISS_TIME_OUT),
                  subs_timer_stamp(SUBS_TIME_OUT),
-				 ji_card_stamp(JI_CARD_TIME_OUT)
+				 ji_card_stamp(JI_CARD_TIME_OUT),
+				 club_timer_stamp(CLUB_TIME_OUT)
 {
     preready_timer.data = this;
     ev_timer_init(&preready_timer, Table::preready_timer_cb,
@@ -90,7 +91,9 @@ Table::Table() : preready_timer_stamp(PREREADY_TIME_OUT),
 
 	ji_card_timer.data = this;
     ev_timer_init(&ji_card_timer, Table::ji_card_timer_cb, ji_card_stamp, ji_card_stamp);
-
+	
+	club_timer.data = this;
+    ev_timer_init(&club_timer, Table::club_timer_cb, club_timer_stamp, club_timer_stamp);
     cur_flow_mode = FLOW_END;
 
     owner_uid = -1;
@@ -114,6 +117,7 @@ Table::~Table()
     ev_timer_stop(zjh.loop, &ahead_start_timer);
     ev_timer_stop(zjh.loop, &subs_timer);
 	ev_timer_stop(zjh.loop, &ji_card_timer);
+	ev_timer_stop(zjh.loop, &club_timer);
 }
 
 int Table::init(int my_tid, int my_vid, int my_zid, int my_type, float my_fee,
@@ -191,13 +195,18 @@ int Table::init(int my_tid, int my_vid, int my_zid, int my_type, float my_fee,
     ji_pai.clear();
     set_card_flag = zjh.conf["tables"]["set_card_flag"].asInt();
     ts = time(NULL);
-
-    return 0;
+    create_rmb = 0;
+    create_aa_rmb = 0;
+    auto_flag = 0;
+    clubid = 0;
+    rmb_cost = 0;
+    create_from_club = 0;
+	return 0;
 }
 
 void Table::init_table_type(int set_type, int set_has_ghost, int set_has_feng, int set_hu_pair, int set_horse_num,
                             int set_max_board, int set_fang_pao, int set_dead_double, int set_forbid_same_ip,
-                            int set_forbid_same_place, int set_substitute, int set_cost_select_flag, int set_ben_ji, int set_wu_gu_ji, int set_bao_ji)
+                            int set_forbid_same_place, int set_substitute, int set_cost_select_flag, int set_ben_ji, int set_wu_gu_ji, int set_bao_ji, int set_auto_flag, int set_clubid, int set_create_from_club)
 {
     type = set_type;
     has_ghost = set_has_ghost;
@@ -209,6 +218,10 @@ void Table::init_table_type(int set_type, int set_has_ghost, int set_has_feng, i
     fang_pao = set_fang_pao;
     substitute = set_substitute;
     cost_select_flag = set_cost_select_flag;
+    auto_flag = set_auto_flag;
+    clubid = set_clubid;
+    create_from_club = set_create_from_club;
+    rmb_cost = 0;
     ts = time(NULL);
     ahead_start_flag = 0;
     ahead_start_uid = -1;
@@ -459,6 +472,12 @@ int Table::handler_login(Player *player)
         ev_timer_again(zjh.loop, &subs_timer);
         return 0;
     }
+    
+    if (auto_flag == 0 && clubid > 0 && is_create)
+    {
+        handler_club_create_req(player);
+        ev_timer_again(zjh.loop, &club_timer);
+    }
 
     if (players.find(player->uid) == players.end())
     {
@@ -498,6 +517,11 @@ int Table::handler_login(Player *player)
         if (substitute == 1)
         {
             modify_substitute_info(player, 1);
+        }
+
+        if (clubid > 0)
+        {
+            modify_club_info(player, 1);
         }
 
         mjlog.info("handler login succ uid[%d] money[%d] cur_players[%d] tid[%d].\n", player->uid, player->money, cur_players, tid);
@@ -557,6 +581,11 @@ int Table::del_player(Player *player)
     cur_players--;
 
     modify_substitute_info(player, 0);
+    if (clubid > 0)
+    {
+        modify_club_info(player, 0);
+    }
+
 
     return 0;
 }
@@ -648,6 +677,9 @@ int Table::handler_table_info(Player *player)
     packet.val["chu_seat"] = chu_seat;
     packet.val["chu_card"] = last_card.value;
     packet.val["cost_select_flag"] = cost_select_flag;
+    packet.val["create_from_club"] = create_from_club;
+	packet.val["cur_clubid"] = clubid;
+	packet.val["auto_flag"] = auto_flag;
     mjlog.debug("handler_table_info redpackes.size() [%d] seats[%d].already_get_red [%d]\n",
                 redpackes.size(), player->seatid, seats[player->seatid].already_get_red);
     if (redpackes.size() > 0 && seats[player->seatid].already_get_red == 0)
@@ -1091,6 +1123,7 @@ int Table::test_game_start()
 int Table::game_start()
 {
     ev_timer_stop(zjh.loop, &subs_timer);
+    ev_timer_stop(zjh.loop, &club_timer);
     ts = time(NULL);
     Replay::init_handler();
     // replay.append_record(config_of_replay);
@@ -1114,8 +1147,15 @@ int Table::game_start()
             modify_substitute_info(1);
             zjh.game->del_subs_table(owner_uid);
         }
+        if (clubid > 0)
+        {
+            modify_club_info(1);
+            if (auto_flag == 1)
+            {
+                zjh.club_rc->command("hset club:%d auto_room 0", clubid);
+            }
+        }
     }
-
     replay.init(ts, ttid); //记录回放
     round_count++;
 
@@ -4167,10 +4207,29 @@ void Table::clean_table()
         zjh.game->del_subs_table(owner_uid);
         insert_flow_log(0);
     }
-
-    if (round_count > 0)
+    
+    if (clubid > 0 && round_count == 0)
     {
-        if (!transfer_flag && substitute != 1)
+        if (auto_flag == 1)//俱乐部机器人开房
+        {
+            Player::incr_club_rmb(clubid, create_rmb);
+            zjh.club_rc->command("hset club:%d auto_room 0", clubid);
+        }
+        else if (rmb_cost == 0 && auto_flag == 0) //玩家开房扣除俱乐部钻石
+        {
+            Player::incr_club_every_rmb(owner_uid,  clubid, -create_rmb);
+            Player::incr_club_rmb(clubid, create_rmb);
+        }
+        else if (rmb_cost ==1 && auto_flag == 0)//玩家开房 扣除玩家自己的钻石
+        {
+            Player::incr_rmb(owner_uid, create_rmb);
+        }
+		insert_flow_log(0);
+	}
+
+	if (round_count > 0)
+	{
+		if (!transfer_flag && substitute != 1 && clubid == 0)
         {
             create_table_cost();
         }
@@ -4224,7 +4283,13 @@ void Table::clean_table()
         modify_substitute_info(2);
     }
 
-    zjh.temp_rc->command("LPUSH tids_list %d", ttid);
+    if (clubid > 0)
+    {
+        clear_club_info();
+        modify_club_info(2);
+    }
+
+	zjh.temp_rc->command("LPUSH tids_list %d", ttid);
     zjh.game->table_ttid.erase(ttid);
     zjh.game->set_table_flag(ttid, 0);
     zjh.game->table_owners.erase(owner_uid);
@@ -4242,8 +4307,15 @@ void Table::clean_table()
     ahead_start_flag = 0;
     ahead_start_uid = -1;
     game_end_flag = 0;
+	red_open_flag = 0;
+	red_open_count = 2;
+	red_open_seat = seat_max;
     dismiss.clear();
     redpackes.clear();
+    clubid = 0;
+    auto_flag = 0;
+    rmb_cost = 0;
+    create_from_club = 0;
 
     for (int i = 0; i < seat_max; i++)
     {
@@ -4256,6 +4328,7 @@ void Table::clean_table()
     ev_timer_stop(zjh.loop, &ready_timer);
     ev_timer_stop(zjh.loop, &dismiss_timer);
     ev_timer_stop(zjh.loop, &subs_timer);
+    ev_timer_stop(zjh.loop, &club_timer);
     ev_timer_stop(zjh.loop, &ahead_start_timer);
     //ev_timer_stop(zjh.loop, &single_ready_timer);
 }
@@ -4429,6 +4502,8 @@ int Table::insert_flow_round_record()
     packet.val["table_owner"] = owner_uid;
     packet.val["owner_name"] = owner_name;
     packet.val["substitute"] = substitute;
+    packet.val["clubid"] = clubid;
+    packet.val["total_round"] = max_play_board;
     packet.val["type"] = zjh.conf["tables"]["type"].asInt();
 
     int index = 1;
@@ -4476,8 +4551,8 @@ int Table::insert_flow_round_record()
     for (int i = 0; i < seat_max; i++)
     {
         if (seats[i].occupied == 0)
-        {
-            mjlog.error("insert_flow_round_record seatid %d don't dealed\n");
+		{
+			mjlog.error("insert_flow_round_record seatid %d don't dealed\n", i);
             continue;
         }
 
@@ -5558,7 +5633,7 @@ void Table::update_account_bet()
                             score_from_players_item_total[i][ZI_MO_TYPE] += 20;
                         }
                     }
-                    mjlog.debug("score item zi_mo_type# to[%d] cnt[%d] card_type[%d]\n", score_to_players_item_total[j][ZI_MO_TYPE], score_to_players_item_count[j][ZI_MO_TYPE], seats[j].card_type);
+                    mjlog.debug("score item zi_mo_type# to[%d] cnt[%d] card_type[%d]\n", score_to_players_item_total[j][ZI_MO_TYPE], score_to_players_item_count[j][ZI_MO_TYPE], seats[i].card_type);
                 }
             }
             //连庄
@@ -5583,13 +5658,13 @@ void Table::update_account_bet()
                         {//报杀玩家多出分
                             if (seats[i].card_type == CARD_TYPE_PING_HU && tian_hu_flag == 0 && di_hu_flag == 0)
                             {
-                                score_to_players_item_total[j][ZI_MO_TYPE] += 18;
-                                score_from_players_item_total[i][ZI_MO_TYPE] += 18;
+                                score_to_players_item_total[j][LIAN_ZHUANG_TYPE] += 18;
+                                score_from_players_item_total[i][LIAN_ZHUANG_TYPE] += 18;
                             }
                             else
                             {
-                                score_to_players_item_total[j][ZI_MO_TYPE] += 20;
-                                score_from_players_item_total[i][ZI_MO_TYPE] += 20;
+                                score_to_players_item_total[j][LIAN_ZHUANG_TYPE] += 20; 
+                                score_from_players_item_total[i][LIAN_ZHUANG_TYPE] += 20;
                             }
                         }
 						mjlog.debug("score item lian_zhuang_type# to[%d] cnt[%d] \n", score_to_players_item_total[j][LIAN_ZHUANG_TYPE], score_to_players_item_count[j][LIAN_ZHUANG_TYPE]);
@@ -6193,10 +6268,10 @@ void Table::ahead_start_timer_cb(struct ev_loop *loop, struct ev_timer *w, int r
 
 void Table::subs_timer_cb(struct ev_loop *loop, struct ev_timer *w, int revents)
 {
-    Table *table = (Table *)w->data;
-    ev_timer_stop(zjh.loop, &table->ahead_start_timer);
+    Table *table = (Table*) w->data;
+	ev_timer_stop(zjh.loop, &table->subs_timer);
 
-    table->clean_table();
+	table->clean_table();
 }
 
 //提前开始申请时间到了默认是不提前开始
@@ -6453,6 +6528,7 @@ int Table::handler_cmd(int cmd, Player *player)
 
     return 0;
 }
+
 
 int Table::handler_redpacket()
 {
@@ -7193,4 +7269,255 @@ void Table::record_table_info()
     // packet.val["ghost_card"] = ghost_card;
 	packet.end();
 	replay.append_record(packet.tojson());	
+}
+
+
+void Table::handler_redpacket_open_condition()
+{
+	int ret;
+    const char* key = zjh.conf["tables"]["red_open_key"].asCString();
+
+    ret = zjh.temp_rc->command("hget red_open_charge %s", key);
+	if (ret < 0)
+	{
+		red_open_flag = 0;
+		mjlog.error("handler_redpacket_open_condition get red open flag error ret < 0.\n");
+		return ;
+	}
+
+    if (zjh.temp_rc->reply->str == NULL)
+	{
+		red_open_flag = 0;
+		mjlog.error("handler_redpacket_open_condition get red open flag error reply->str == NULL.\n");
+		return ;
+	}
+
+	mjlog.info("handler_redpacket_open_condition get red open flag %s.\n", zjh.temp_rc->reply->str);
+	red_open_flag = atoi(zjh.temp_rc->reply->str);
+
+	key = zjh.conf["tables"]["red_open_count_key"].asCString();
+
+	ret = zjh.temp_rc->command("hget red_open_charge %s", key);
+	if (ret < 0)
+	{
+		red_open_count = 2;
+		mjlog.error("handler_redpacket_open_condition get red open flag error ret < 0.\n");
+		return ;
+	}
+
+	if (zjh.temp_rc->reply->str == NULL)
+	{
+		red_open_count = 2;
+		mjlog.error("handler_redpacket_open_condition get red open count error reply->str == NULL.\n");
+		return ;
+	}
+	
+	mjlog.info("handler_redpacket_open_condition get red open count %s.\n", zjh.temp_rc->reply->str);
+	red_open_count = atoi(zjh.temp_rc->reply->str);
+
+	key = zjh.conf["tables"]["red_open_seat_key"].asCString();
+
+	ret = zjh.temp_rc->command("hget red_open_charge %s", key);
+	if (ret < 0)
+	{
+		red_open_seat = seat_max;
+		mjlog.error("handler_redpacket_open_condition get red open seat rmb error ret < 0.\n");
+		return ;
+	}
+
+	if (zjh.temp_rc->reply->str == NULL)
+	{
+		red_open_seat = seat_max;
+		mjlog.error("handler_redpacket_open_condition get red open seas error reply->str == NULL.\n");
+		return ;
+	}
+	
+	mjlog.info("handler_redpacket_open_condition get red open seat %s.\n", zjh.temp_rc->reply->str);
+	red_open_seat = atoi(zjh.temp_rc->reply->str);
+	if (red_open_seat > seat_max)
+	{
+		red_open_seat = seat_max;
+	}
+	return ;
+}
+
+void Table::club_timer_cb(struct ev_loop *loop, struct ev_timer *w, int revents)
+{
+    Table *table = (Table*) w->data;
+    ev_timer_stop(zjh.loop, &table->club_timer);
+
+    table->clean_table();
+}
+
+void Table::handler_club_create_req(Player *player)
+{
+    Json::Value &val = player->client->packet.tojson();
+	std::string playway_desc = val["ruler"].asString();
+	int player_max = val["player_max"].asInt();
+    Jpacket packet;
+	packet.val["cmd"] = SERVER_CLUB_SUCC_UC;
+	packet.val["uid"] = player->uid;
+    packet.val["ttid"] = ttid;
+    packet.val["rmb"] = create_rmb ;
+	packet.end();
+	unicast(player, packet.tostring());
+    owner_uid = player->uid;
+    owner_name = player->name;
+
+    Player::incr_club_every_rmb(player->uid, clubid, create_rmb);
+    CLUB cur_club ; 
+    zjh.game->init_club(cur_club, clubid);
+    rmb_cost = cur_club.rmb_cost;
+    if (rmb_cost == 0)
+    {
+        Player::incr_club_rmb(clubid, -create_rmb);
+    }
+    else
+    {
+        player->incr_rmb(player->uid, -create_rmb);
+    }
+	insert_flow_log(1);
+
+	int ret = zjh.temp_rc->command("hmset create:cl_%d:%d:%d clubid %d uid %d tid %d type %d size 0 status 0 ts %d ruler %s player_max %d auto_flag %d name 河池麻将  max_play_board %d rmb_cost %d create_rmb %d",
+        clubid, player->uid, ttid, clubid, player->uid, ttid, type, (int)time(NULL), 
+        playway_desc.c_str(), player_max, auto_flag, max_play_board, rmb_cost, create_rmb);
+
+    if (ret < 0)
+    {
+        mjlog.error("insert club info error");
+        return;
+    }
+
+    ret = zjh.temp_rc->command("lpush create:cl_%d create:cl_%d:%d:%d", clubid, clubid, player->uid, ttid);
+    if (ret < 0)
+    {
+        mjlog.error("add club info error");
+        return;
+    }
+}
+
+void Table::handler_club_auto_create_req(std::string  playway_desc, int player_max, std::string name)
+{
+	insert_flow_log(1);
+	owner_name = name;
+    int ret = zjh.temp_rc->command("hmset create:cl_%d:%d:%d clubid %d uid %d tid %d type %d size 0 status 0 ts %d ruler %s player_max %d auto_flag %d name 河池麻将  max_play_board %d rmb_cost 0 create_rmb %d",
+        clubid, owner_uid, ttid, clubid, owner_uid, ttid, type, (int)time(NULL), 
+        playway_desc.c_str(), player_max, auto_flag, max_play_board, create_rmb);
+
+    if (ret < 0)
+    {
+        mjlog.error("insert club info error");
+        return;
+    }
+
+    ret = zjh.temp_rc->command("lpush create:cl_%d create:cl_%d:%d:%d", clubid, clubid, owner_uid, ttid);
+    if (ret < 0)
+    {
+        mjlog.error("add club info error");
+        return;
+    }
+    ret = zjh.club_rc->command("hset club:%d auto_room 1", clubid);
+    if (ret <0)
+    {
+        mjlog.error("hset club %d auto_room error\n");
+        return ;
+    }
+
+}
+
+void Table::modify_club_info(Player* player, int flag)
+{
+    int ret = zjh.temp_rc->command("hget create:cl_%d:%d:%d size", clubid, owner_uid, ttid);
+    if (ret < 0)
+    {
+        mjlog.error("get club info error");
+        return;
+    }
+
+    if (zjh.temp_rc->reply->str == NULL)
+    {
+        mjlog.error("get club str error");
+        return;
+    }
+    int size = atoi(zjh.temp_rc->reply->str);
+
+    if (flag == 1)
+    {
+        size += 1;
+
+        ret = zjh.temp_rc->command("hmset create:cl_%d:%d:%d uid%d %d size %d", clubid, owner_uid, ttid, size, player->uid, size);
+        if (ret < 0)
+        {
+            mjlog.error("modify substitute info error");
+            return;
+        }
+    }
+    else
+    {
+        if (size <= 0)
+        {
+            return;
+        }
+
+        vector<int> uids;
+        for (int i = 0; i < seat_max; i++)
+        {
+            if (seats[i].player != NULL)
+            {
+                uids.push_back(seats[i].uid);
+            }
+        }
+
+        size = uids.size();
+
+        if (uids.size() == 4)
+        {
+            ret = zjh.temp_rc->command("hmset create:cl_%d:%d:%d uid1 %d uid2 %d uid3 %d uid4 %d size %d",
+                                       clubid, owner_uid, ttid, uids[0], uids[1], uids[2], uids[3], size);
+        }
+        else if (uids.size() == 3)
+        {
+            ret = zjh.temp_rc->command("hmset create:cl_%d:%d:%d uid1 %d uid2 %d uid3 %d size %d",
+                                       clubid, owner_uid, ttid, uids[0], uids[1], uids[2], size);
+        }
+        else if (uids.size() == 2)
+        {
+            ret = zjh.temp_rc->command("hmset create:cl_%d:%d:%d uid1 %d uid2 %d size %d",
+                                       clubid, owner_uid, ttid, uids[0], uids[1], size);
+        }
+        else if (uids.size() == 1)
+        {
+            ret = zjh.temp_rc->command("hmset create:cl_%d:%d:%d uid1 %d size %d",
+                                       clubid, owner_uid, ttid, uids[0], size);
+        }
+        else if (uids.size() == 0)
+        {
+            ret = zjh.temp_rc->command("hmset create:cl_%d:%d:%d size %d",
+                                       clubid, owner_uid, ttid, size);
+        }
+
+        if (ret < 0)
+        {
+            mjlog.error("set club info error");
+        }    
+    }
+}
+
+void Table::modify_club_info(int status)
+{
+    int ret = zjh.temp_rc->command("hset create:cl_%d:%d:%d status %d", clubid, owner_uid, ttid, status);
+    if (ret < 0)
+    {
+        mjlog.error("modify club status error");
+        return;
+    }
+}
+
+void Table::clear_club_info()
+{
+    int ret = zjh.temp_rc->command("lrem create:cl_%d 0 create:cl_%d:%d:%d", clubid, clubid, owner_uid, ttid);
+    if (ret < 0)
+    {
+        mjlog.error("clear club info error");
+    }
 }

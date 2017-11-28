@@ -40,7 +40,14 @@ public:
     int get_rmb_num(int play_board);
 	int get_substitute_flag(Table* table);
     void handler_dismiss_table(Table * table);
-
+    void set_club_auto_room_flag(Table *table, int auto_flag);
+    int get_club_auto_room_flag(Table *table);
+    void set_table_club(Table * table, int club_id);
+    int get_club_id(Table * table);
+    void handler_club_create_auto(Table * table, Json::Value &val, std::string name);
+    int get_owner_uid(Table* table);
+    int get_round_count(Table* table);
+    
 private:
     static TableDelegate* m_pdl;
 };

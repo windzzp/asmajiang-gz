@@ -23,6 +23,7 @@ public:
 	RedisClient			*main_rc[20];
 	int					main_size;
 	RedisClient			*temp_rc;
+	RedisClient			*club_rc;
 	RedisClient			*record_rc;
 	LogAgent 			logAgent;
 private:

@@ -16,6 +16,7 @@
 #include <string>
 #include <map>
 #include <set>
+#include <vector>
 
 class Client;
 class Player;
@@ -34,6 +35,14 @@ enum CreateTableErr
     CREATE_TABLE_STATE_NOT_PERMIT,
     CREATE_TABLE_IN_TABLE,
     CREATE_TABLE_MAX_SUBS,
+    CREATE_TABLE_NOT_FIND_CLUB,//没有找到该俱乐部
+    CREATE_TABLE_CLUB_HAVE_NOT_RMB,//俱乐部钻石不足
+    CREATE_TABLE_CLUB_ALREADY_AUTO_ROOM,//存在自动开的房间未开始
+    CREATE_TABLE_ONLY_CHARGE_CREATE_TABLE,//只有管理者才能开房
+    CREATE_TABLE_NOT_CLUB_UIDS,//不是俱乐部成员不能开房
+    CREATE_TABLE_IN_CLUB_BLACK_UIDS,//在俱乐部黑名单中
+    CREATE_TABLE_CLUB_OVER_EVERY_RMB,//超过每日上限
+
 };
 
 enum JoinTableErr
@@ -46,7 +55,42 @@ enum JoinTableErr
     JOIN_TABLE_HAVE_NOT_MONEY,
     JOIN_TABLE_FORBID_SAME_IP,
     JOIN_TABLE_FORBID_SAME_GPS,
+    JOIN_TABLE_IN_CLUB_BLACK_UIDS,//在该俱乐部的黑名单中
+    JOIN_TABLE_ONLY_CLUB_UIDS,//只允许本俱乐部成员可进
 };
+
+typedef struct
+{
+    int club_id;                 //俱乐部id
+    int aid;                     //俱乐部代理id
+    std::string aname;           //代理的姓名
+    std::vector<int> uids;       //俱乐部成员id
+    std::vector<int> black_uids; //俱乐部黑名单成员
+    int rmb;                     //俱乐部账户钻石
+    int rmb_every;               //俱乐部成员每人每天能消耗钻石数
+    int status;                  //俱乐部状态 0 可用 -1 解散
+    int auto_room;               //是否已经存在俱乐部机器人开房了 没有开始的。
+    int rmb_cost;                //付费模式 0 扣俱乐部 1 开房者
+    int join_room;               // 加入房间条件 0 任何人 1 俱乐部成员
+    int create_play;             // 开房权限 0群主开房  1 俱乐部成员(具体还不知道怎么用)
+
+    void clear(void)
+    {
+        club_id = 0;
+        aid = 0;
+        aname = "";
+        uids.clear();
+        black_uids.clear();
+        rmb = 0;
+        rmb_every = 0;
+        status = 0;
+        auto_room = 0;
+        rmb_cost = 0;
+        join_room = 0;
+        create_play = 0;
+    }
+}CLUB;
+
 
 class Game
 {
@@ -89,7 +133,8 @@ public:
 
     int dispatch(Client *client);
 	int safe_check(Client *client, int cmd);
-	int handler_login_table(Client *client);
+    int handler_login_table(Client *client);
+    
 	int login_table(Client *client, std::map<int, Table*> &a, std::map<int, Table*> &b);
 	
 	int handle_logout_table(int tid);
@@ -101,7 +146,9 @@ public:
     int switch_table(Player *player);
 
     int check_up_list(Client *client);
+    int handler_create_req(Client * client);
     int handler_create_table_req(Client* client);
+    int handler_create_table_club_req(Client* client);
     void handler_create_table_req_error(Client* client, int reason);
     void handler_create_table_req_error(Client* client, int uid, int reason);
     int handler_join_table_req(Client* client);
@@ -117,8 +164,10 @@ public:
 
     void set_table_flag(int tid, int flag);
     void clear_table_flag();
+    void clear_online_uid();
     int handler_login_game_succ_uc(Client* client);
     int login_create_table(Client* client);
+    int login_create_club_table(Client * client, CLUB & club);
     int handler_robot_login_table(Client* client);
     int register_server_key();
     bool is_online(Player* player);
@@ -127,7 +176,9 @@ public:
     static int get_create_aarmb();
 
 	int get_play_rmb(int max_play_count, int cost_select_flag);
-	int del_subs_table(int uid);
+    int del_subs_table(int uid);
+    int get_clubid_rmb_every(int cur_clubid, int uid);
+    int init_club(CLUB & club, int ciub_id);
 public:
 	int     init_table();
 	bool 	robot_is_ok(int pid, int num);
