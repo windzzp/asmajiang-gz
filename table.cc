@@ -465,6 +465,7 @@ int Table::handler_login(Player *player)
 {
     Json::Value &val = player->client->packet.tojson();
     bool is_create = (val["cmd"].asInt() == CLIENT_CREATE_TABLE_REQ);
+	ruler = val["ruler"].asString();
 
     if (substitute == 1 && is_create)
     {
@@ -1215,6 +1216,10 @@ int Table::game_start()
         packet.val["remain_cards"] = int(deck.cards.size());
         packet.val["cur_round"] = round_count;
         packet.val["total_round"] = max_play_board;
+        packet.val["create_from_club"] = create_from_club;
+        packet.val["cur_clubid"] = clubid;
+        packet.val["player_max"] = max_ready_players;
+        packet.val["ruler"] = ruler;
         for (int i = 0; i < seat_max; i++)
         {
             if (seats[i].ready != 1)
@@ -7378,7 +7383,7 @@ void Table::handler_club_create_req(Player *player)
     }
 	insert_flow_log(1);
 
-	int ret = zjh.temp_rc->command("hmset create:cl_%d:%d:%d clubid %d uid %d tid %d type %d size 0 status 0 ts %d ruler %s player_max %d auto_flag %d name 河池麻将  max_play_board %d rmb_cost %d create_rmb %d",
+	int ret = zjh.temp_rc->command("hmset create:cl_%d:%d:%d clubid %d uid %d tid %d type %d size 0 status 0 ts %d ruler %s player_max %d auto_flag %d name 安顺麻将  max_play_board %d rmb_cost %d create_rmb %d",
         clubid, player->uid, ttid, clubid, player->uid, ttid, type, (int)time(NULL), 
         playway_desc.c_str(), player_max, auto_flag, max_play_board, rmb_cost, create_rmb);
 
@@ -7400,7 +7405,7 @@ void Table::handler_club_auto_create_req(std::string  playway_desc, int player_m
 {
 	insert_flow_log(1);
 	owner_name = name;
-    int ret = zjh.temp_rc->command("hmset create:cl_%d:%d:%d clubid %d uid %d tid %d type %d size 0 status 0 ts %d ruler %s player_max %d auto_flag %d name 河池麻将  max_play_board %d rmb_cost 0 create_rmb %d",
+    int ret = zjh.temp_rc->command("hmset create:cl_%d:%d:%d clubid %d uid %d tid %d type %d size 0 status 0 ts %d ruler %s player_max %d auto_flag %d name 安顺麻将  max_play_board %d rmb_cost 0 create_rmb %d",
         clubid, owner_uid, ttid, clubid, owner_uid, ttid, type, (int)time(NULL), 
         playway_desc.c_str(), player_max, auto_flag, max_play_board, create_rmb);
 

@@ -500,6 +500,7 @@ public:
     int                         clubid;//俱乐部id是多少
     int                         rmb_cost;//付费模式
     int                         create_from_club;
+    string                      ruler;
 public:
     Table();
     virtual ~Table();
