@@ -70,6 +70,8 @@ typedef struct
     int rmb_every;               //俱乐部成员每人每天能消耗钻石数
     int status;                  //俱乐部状态 0 可用 -1 解散
     int auto_room;               //是否已经存在俱乐部机器人开房了 没有开始的。
+    int auto_room1;               //是否已经存在俱乐部机器人开房了 没有开始的。
+    int auto_room2;               //是否已经存在俱乐部机器人开房了 没有开始的。
     int rmb_cost;                //付费模式 0 扣俱乐部 1 开房者
     int join_room;               // 加入房间条件 0 任何人 1 俱乐部成员
     int create_play;             // 开房权限 0群主开房  1 俱乐部成员(具体还不知道怎么用)
@@ -85,6 +87,8 @@ typedef struct
         rmb_every = 0;
         status = 0;
         auto_room = 0;
+        auto_room1 = 0;
+        auto_room2 = 0;
         rmb_cost = 0;
         join_room = 0;
         create_play = 0;

@@ -680,7 +680,14 @@ int Table::handler_table_info(Player *player)
     packet.val["cost_select_flag"] = cost_select_flag;
     packet.val["create_from_club"] = create_from_club;
 	packet.val["cur_clubid"] = clubid;
-	packet.val["auto_flag"] = auto_flag;
+    if (auto_flag >= 1)
+    {
+        packet.val["auto_flag"] = 1;
+    }
+    else
+    {
+        packet.val["auto_flag"] = 0;
+    }
     mjlog.debug("handler_table_info redpackes.size() [%d] seats[%d].already_get_red [%d]\n",
                 redpackes.size(), player->seatid, seats[player->seatid].already_get_red);
     if (redpackes.size() > 0 && seats[player->seatid].already_get_red == 0)
@@ -1154,6 +1161,14 @@ int Table::game_start()
             if (auto_flag == 1)
             {
                 zjh.club_rc->command("hset club:%d auto_room 0", clubid);
+            }
+            else if (auto_flag == 2)
+            {
+                zjh.club_rc->command("hset club:%d auto_room1 0", clubid);
+            }
+            else if (auto_flag == 3)
+            {
+                zjh.club_rc->command("hset club:%d auto_room2 0", clubid);
             }
         }
     }
@@ -4215,11 +4230,25 @@ void Table::clean_table()
     
     if (clubid > 0 && round_count == 0)
     {
-        if (auto_flag == 1)//俱乐部机器人开房
+        if (auto_flag >= 1) //俱乐部机器人开房
         {
-            Player::incr_club_rmb(clubid, create_rmb);
-            zjh.club_rc->command("hset club:%d auto_room 0", clubid);
-        }
+			Player::incr_club_rmb(clubid, create_rmb);
+            if (round_count == 0)
+            {
+                if (auto_flag == 1)
+                {
+                    zjh.club_rc->command("hset club:%d auto_room 0", clubid);
+                }
+                else if (auto_flag == 2)
+                {
+                    zjh.club_rc->command("hset club:%d auto_room1 0", clubid);
+                }
+                else if (auto_flag == 3)
+                {
+                    zjh.club_rc->command("hset club:%d auto_room2 0", clubid);
+                }
+            }
+		}
         else if (rmb_cost == 0 && auto_flag == 0) //玩家开房扣除俱乐部钻石
         {
             Player::incr_club_every_rmb(owner_uid,  clubid, -create_rmb);
@@ -7421,11 +7450,32 @@ void Table::handler_club_auto_create_req(std::string  playway_desc, int player_m
         mjlog.error("add club info error");
         return;
     }
-    ret = zjh.club_rc->command("hset club:%d auto_room 1", clubid);
-    if (ret <0)
+    if (auto_flag == 1)
     {
-        mjlog.error("hset club %d auto_room error\n");
-        return ;
+        ret = zjh.club_rc->command("hset club:%d auto_room 1", clubid);
+        if (ret < 0)
+        {
+            mjlog.error("hset club %d auto_room error\n");
+            return;
+        }
+    }
+    else if (auto_flag == 2)
+    {
+        ret = zjh.club_rc->command("hset club:%d auto_room1 1", clubid);
+        if (ret < 0)
+        {
+            mjlog.error("hset club %d auto_room error\n");
+            return;
+        }
+    }
+    else if (auto_flag == 3)
+    {
+        ret = zjh.club_rc->command("hset club:%d auto_room2 1", clubid);
+        if (ret < 0)
+        {
+            mjlog.error("hset club %d auto_room error\n");
+            return;
+        }
     }
 
 }
