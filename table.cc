@@ -6346,7 +6346,11 @@ int Table::handler_transfer_owner_req(Player *player)
         handler_transfer_owner_req_error(player, 3);
         return -1;
     }
-
+	if (substitute == 1)
+    {
+        handler_transfer_owner_req_error(player, 4);
+		return -1;
+    }
     //AA付费没没有转让房主
     if (cost_select_flag == 2)
     {
