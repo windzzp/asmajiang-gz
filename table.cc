@@ -246,7 +246,7 @@ void Table::init_table_type(int set_type, int set_has_ghost, int set_has_feng, i
     already_update_account_bet = 0;
     sha_bao = 0;
     fang_card = 0;
-    deck.init(has_feng, has_ghost, horse_num, hu_pair, 0);
+    deck.init(has_feng, has_ghost, 1, hu_pair, 0);
 }
 
 int Table::get_card_type(int salt)
@@ -5102,10 +5102,10 @@ void Table::update_account_bet()
     zhong_horse.clear();
 
     // 处理鸡牌
-    if (horse_num == 0)
-    {
-        return;
-    }
+    // if (horse_num == 0)
+    // {
+    //     return;
+    // }
 
     //根据规则，将所有的鸡牌算出来
     //幺鸡固定为鸡牌

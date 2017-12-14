@@ -501,6 +501,14 @@ public:
     int                         rmb_cost;//付费模式
     int                         create_from_club;
     string                      ruler;
+
+    //控制多人可操作成员的变量
+    std::vector<int>      handler_hu_seats; //可进行胡操作的玩家
+    std::vector<int>      handler_chi_seats;  
+    std::vector<int>      handler_peng_seats;
+    std::vector<int>      handler_gang_seats;
+    std::vector<int>      handler_seats;  //需要进行操作的玩家。
+    std::map<int, int>    handler_flags; //某个玩家是否处理了动作，0表示没有处理。
 public:
     Table();
     virtual ~Table();
