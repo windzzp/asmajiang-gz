@@ -502,6 +502,8 @@ public:
     int                         create_from_club;
     string                      ruler;
 
+	int                         game_end_count_flag;
+    int                         need_return_diamo;
     //控制多人可操作成员的变量
     std::vector<int>      handler_hu_seats; //可进行胡操作的玩家
     std::vector<int>      handler_chi_seats;  

@@ -201,6 +201,8 @@ int Table::init(int my_tid, int my_vid, int my_zid, int my_type, float my_fee,
     clubid = 0;
     rmb_cost = 0;
     create_from_club = 0;
+    game_end_count_flag = 0;
+    need_return_diamo = 0;
 	return 0;
 }
 
@@ -208,6 +210,8 @@ void Table::init_table_type(int set_type, int set_has_ghost, int set_has_feng, i
                             int set_max_board, int set_fang_pao, int set_dead_double, int set_forbid_same_ip,
                             int set_forbid_same_place, int set_substitute, int set_cost_select_flag, int set_ben_ji, int set_wu_gu_ji, int set_bao_ji, int set_auto_flag, int set_clubid, int set_create_from_club)
 {
+    game_end_count_flag = 0;
+    need_return_diamo = 0;
     type = set_type;
     has_ghost = set_has_ghost;
     has_feng = set_has_feng;
@@ -1887,6 +1891,7 @@ int Table::game_end(int flag)
 		save_flag = 1;
 	}
     state = END_GAME;
+    game_end_count_flag = 1;
 
     if (players.size() == 0)
     {
@@ -4072,6 +4077,11 @@ int Table::handler_dismiss_table(Player *player)
     Json::Value &val = player->client->packet.tojson();
     int agree = val["flag"].asInt();
 
+    if (game_end_flag == 1)
+    {
+        return 0;
+    }
+
     if (round_count == 0)
     {
         if (player->uid == owner_uid)
@@ -4101,12 +4111,8 @@ int Table::handler_dismiss_table(Player *player)
                     ratio = max_play_board / base_play_board;
                 }
 
-                if (players.find(origin_owner_uid) != players.end())
-                {
-                    players[origin_owner_uid]->incr_rmb(create_rmb * ratio);
-                    // Player *player1 = players[origin_owner_uid];
-                    insert_flow_log(0);
-                }
+                Player::incr_rmb(origin_owner_uid, create_rmb);
+                insert_flow_log(0);
             }
 
             clean_table();
@@ -4165,6 +4171,10 @@ int Table::handler_dismiss_table(Player *player)
                 seats[i].bet = 0;
             }
 
+            if(game_end_count_flag == 0)
+			{
+				need_return_diamo = 1;
+			}
             game_end(1);
             dismiss.clear();
             reset();
@@ -4221,14 +4231,14 @@ void Table::clean_table()
 
     state = ROOM_WAIT_GAME;
 
-    if (round_count == 0 && substitute == 1)
+    if ((round_count == 0 || need_return_diamo == 1) && substitute == 1)
     {
         Player::incr_rmb(owner_uid, create_rmb);
         zjh.game->del_subs_table(owner_uid);
         insert_flow_log(0);
     }
     
-    if (clubid > 0 && round_count == 0)
+	if (clubid > 0 && (round_count == 0 || need_return_diamo == 1))
     {
         if (auto_flag >= 1) //俱乐部机器人开房
         {
@@ -4263,9 +4273,14 @@ void Table::clean_table()
 
 	if (round_count > 0)
 	{
-		if (!transfer_flag && substitute != 1 && clubid == 0)
+		if (!transfer_flag && substitute != 1 && clubid == 0 && need_return_diamo != 1)
         {
             create_table_cost();
+        }
+        if (transfer_flag && substitute != 1 && clubid == 0 && need_return_diamo == 1)
+        {
+	        Player::incr_rmb(origin_owner_uid, create_rmb);
+            insert_flow_log(0);
         }
 
         for (int i = 0; i < seat_max; i++)
@@ -4350,6 +4365,8 @@ void Table::clean_table()
     auto_flag = 0;
     rmb_cost = 0;
     create_from_club = 0;
+	game_end_count_flag = 0;
+    need_return_diamo = 0;
 
     for (int i = 0; i < seat_max; i++)
     {
@@ -4384,6 +4401,10 @@ int Table::dismiss_timeout()
         seats[i].bet = 0;
     }
 
+    if(game_end_count_flag == 0)
+	{
+		need_return_diamo = 1;
+	}
     game_end(1);
     dismiss.clear();
     reset();
